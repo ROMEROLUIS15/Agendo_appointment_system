@@ -4,15 +4,34 @@ import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { Scissors, AlertCircle } from 'lucide-react'
 import { register } from './actions'
+import { PasswordInput } from '@/components/ui/password-input'
+import { registerSchema } from '@/lib/validations/auth'
 
 export default function RegisterPage() {
   const [error, setError] = useState<string | null>(null)
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
   const [isPending, startTransition] = useTransition()
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setError(null)
+    setValidationErrors({})
+    
     const formData = new FormData(e.currentTarget)
+    const data = Object.fromEntries(formData.entries())
+    
+    const result = registerSchema.safeParse(data)
+    
+    if (!result.success) {
+      const errors: Record<string, string> = {}
+      result.error.issues.forEach((issue) => {
+        if (issue.path[0]) {
+          errors[issue.path[0].toString()] = issue.message
+        }
+      })
+      setValidationErrors(errors)
+      return
+    }
     
     startTransition(async () => {
       const res = await register(formData)
@@ -44,13 +63,35 @@ export default function RegisterPage() {
           )}
           
           <div className="grid grid-cols-2 gap-4">
-            <input name="firstName" placeholder="Nombre" className="input-base" required />
-            <input name="lastName" placeholder="Apellido" className="input-base" required />
+            <div className="space-y-1">
+              <input name="firstName" placeholder="Nombre" className={cn("input-base", validationErrors.firstName && "border-red-500")} required />
+              {validationErrors.firstName && <p className="text-[10px] text-red-500">{validationErrors.firstName}</p>}
+            </div>
+            <div className="space-y-1">
+              <input name="lastName" placeholder="Apellido" className={cn("input-base", validationErrors.lastName && "border-red-500")} required />
+              {validationErrors.lastName && <p className="text-[10px] text-red-500">{validationErrors.lastName}</p>}
+            </div>
           </div>
           
-          <input name="bizName" placeholder="Nombre del Negocio" className="input-base" required />
-          <input name="email" type="email" placeholder="Email" className="input-base" required />
-          <input name="password" type="password" placeholder="Contraseña" className="input-base" required />
+          <div className="space-y-1">
+            <input name="bizName" placeholder="Nombre del Negocio" className={cn("input-base", validationErrors.bizName && "border-red-500")} required />
+            {validationErrors.bizName && <p className="text-[10px] text-red-500">{validationErrors.bizName}</p>}
+          </div>
+          
+          <div className="space-y-1">
+            <input name="email" type="email" placeholder="Email" className={cn("input-base", validationErrors.email && "border-red-500")} required />
+            {validationErrors.email && <p className="text-[10px] text-red-500">{validationErrors.email}</p>}
+          </div>
+          
+          <div className="space-y-1">
+            <PasswordInput name="password" placeholder="Contraseña" className={validationErrors.password && "border-red-500"} required />
+            {validationErrors.password && <p className="text-[10px] text-red-500">{validationErrors.password}</p>}
+          </div>
+
+          <div className="space-y-1">
+            <PasswordInput name="confirmPassword" placeholder="Confirmar Contraseña" className={validationErrors.confirmPassword && "border-red-500"} required />
+            {validationErrors.confirmPassword && <p className="text-[10px] text-red-500">{validationErrors.confirmPassword}</p>}
+          </div>
 
           <button disabled={isPending} type="submit" className="btn-primary w-full py-3 mt-4">
             {isPending ? 'Procesando...' : 'Crear cuenta gratis'}
@@ -64,3 +105,5 @@ export default function RegisterPage() {
     </div>
   )
 }
+
+import { cn } from '@/lib/utils'

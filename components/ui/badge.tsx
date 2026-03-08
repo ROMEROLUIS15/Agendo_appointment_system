@@ -10,13 +10,13 @@ interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
 }
 
 const variantClasses: Record<BadgeVariant, string> = {
-  default: 'bg-muted text-muted-foreground',
-  success: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400',
-  warning: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400',
-  danger:  'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400',
-  info:    'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400',
-  brand:   'bg-brand-100 dark:bg-brand-900/30 text-brand-700 dark:text-brand-400 ring-1 ring-brand-300/50',
-  dual:    'bg-brand-100 dark:bg-brand-900/40 text-brand-700 dark:text-brand-400 ring-1 ring-brand-300/50',
+  default: 'bg-muted text-muted-foreground border border-border/50',
+  success: 'bg-success/15 dark:bg-success/20 text-success-foreground font-bold border border-success/10',
+  warning: 'bg-warning/15 dark:bg-warning/20 text-warning-foreground font-bold border border-warning/10',
+  danger:  'bg-danger/15 dark:bg-danger/20 text-danger-foreground font-bold border border-danger/10',
+  info:    'bg-info/15 dark:bg-info/20 text-info-foreground font-bold border border-info/10',
+  brand:   'bg-brand-600 text-white shadow-brand-sm border border-brand-500',
+  dual:    'bg-brand-50/80 dark:bg-brand-900/40 text-brand-700 dark:text-brand-400 ring-1 ring-brand-300/30 border border-brand-200/50',
 }
 
 export function Badge({ variant = 'default', dot = false, className, children, ...props }: BadgeProps) {

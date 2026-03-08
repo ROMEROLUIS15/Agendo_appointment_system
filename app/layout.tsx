@@ -10,6 +10,20 @@ export const metadata: Metadata = {
   description:
     'Plataforma SaaS de gestión de citas para negocios de servicios. Agenda, clientes, finanzas y recordatorios automáticos.',
   keywords: ['agenda', 'citas', 'barbería', 'estética', 'gestión', 'saas'],
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'Agendo',
+  },
+}
+
+export const viewport = {
+  themeColor: '#4f46e5',
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

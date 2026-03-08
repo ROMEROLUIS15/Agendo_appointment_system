@@ -5,10 +5,12 @@ import { Database } from '@/types/database.types'
 export async function createClient() {
   const cookieStore = await cookies()
 
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+
   return createServerClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    // Usamos Service Role Key para acceso total desde el servidor
-    process.env.SUPABASE_SERVICE_ROLE_KEY!, 
+    supabaseUrl,
+    supabaseServiceKey,
     {
       cookies: {
         getAll() {
@@ -20,10 +22,11 @@ export async function createClient() {
               cookieStore.set(name, value, options)
             )
           } catch {
-            // Ignorar si se llama desde Server Components
+            // Ignorar en componentes de servidor sin respuesta directa
           }
         },
       },
+      // Eliminamos el fetch global personalizado ya que puede causar problemas con redirects en Next.js
     }
   )
 }

@@ -9,31 +9,31 @@
    ───────────────────────────────────────────── */
 @layer base {
   :root {
-    /* ── MODO CLARO ─────────────────────────────── */
-    --background: 28 100% 99%; /* #FFFBF7 — blanco cálido */
-    --foreground: 16 100% 8%; /* #1C0A00 — casi negro cálido */
-    --surface: 30 100% 97%; /* #FFF7ED */
-    --card: 0 0% 100%; /* #FFFFFF */
-    --card-foreground: 16 100% 8%;
-    --border: 30 97% 87%; /* #FED7AA */
-    --muted: 30 60% 96%;
-    --muted-foreground: 25 80% 28%; /* #78350F */
-    --primary: 20 90% 49%; /* #EA580C */
+    /* ── PREMIUM SANDSTONE LIGHT ────────────────── */
+    --background: 46 25% 97%;   /* #FAF9F6 */
+    --foreground: 260 14% 8%;   /* #141218 */
+    --surface: 44 26% 94%;      /* #F4F1EA */
+    --card: 0 0% 100%;
+    --card-foreground: 260 14% 8%;
+    --border: 30 25% 82%;       /* #DCD2C8 */
+    --muted: 40 28% 90%;        /* #E6DAC8 */
+    --muted-foreground: 260 6% 31%; /* #5A5550 */
+    --primary: 29 23% 56%;      /* #A48D78 */
     --primary-foreground: 0 0% 100%;
-    --radius: 0.75rem;
+    --radius: 1rem;
   }
 
   .dark {
-    /* ── MODO OSCURO ────────────────────────────── */
-    --background: 20 100% 6%; /* #150A00 — negro cálido profundo */
-    --foreground: 30 100% 98%; /* #FFF7ED */
-    --surface: 20 100% 8%; /* #1C0D00 */
-    --card: 20 100% 10%; /* #241100 */
-    --card-foreground: 30 100% 98%;
-    --border: 20 90% 18%; /* #3D1F00 */
-    --muted: 20 70% 14%;
-    --muted-foreground: 25 55% 51%; /* #C2763D */
-    --primary: 20 90% 49%; /* #EA580C — mismo en ambos modos */
+    /* ── PREMIUM SANDSTONE DARK ─────────────────── */
+    --background: 30 15% 5%;
+    --foreground: 46 25% 97%;
+    --surface: 30 15% 8%;
+    --card: 30 15% 10%;
+    --card-foreground: 46 25% 97%;
+    --border: 30 15% 25%;
+    --muted: 30 15% 12%;
+    --muted-foreground: 30 10% 65%;
+    --primary: 29 23% 56%;
     --primary-foreground: 0 0% 100%;
   }
 
@@ -45,6 +45,8 @@
     font-family: "Inter", system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    /* Prevent text size adjustment after orientation change */
+    -webkit-text-size-adjust: 100%;
   }
 
   body {
@@ -52,6 +54,25 @@
     transition:
       background-color 0.2s ease,
       color 0.2s ease;
+    
+    /* Mobile Native Feel */
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    overscroll-behavior-y: none; /* Prevent pull-to-refresh on internal containers if needed, or handle at root */
+    
+    /* Safe Area Insets for notches */
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+
+  /* Disable selection for interactive elements to mimic native apps */
+  button, 
+  a, 
+  .nav-item {
+    -webkit-user-select: none;
+    user-select: none;
   }
 
   /* Scrollbar personalizado */
@@ -76,51 +97,44 @@
 @layer components {
   /* Tarjeta base */
   .card-base {
-    @apply bg-card text-card-foreground rounded-2xl border border-border shadow-card dark:shadow-card-dark p-6 transition-all duration-200;
+    @apply bg-card text-card-foreground rounded-3xl border border-border/40 shadow-card dark:shadow-card-dark p-7 transition-all duration-300 hover:shadow-brand-sm;
   }
 
   /* Botón primario */
   .btn-primary {
     @apply inline-flex items-center justify-center gap-2 
            bg-brand-600 hover:bg-brand-700 active:bg-brand-800
-           text-white font-semibold rounded-xl px-5 py-2.5
+           text-white font-bold rounded-2xl px-6 py-3
            shadow-brand-sm hover:shadow-brand-md
-           transition-all duration-150 
+           transition-all duration-200 
+           active:scale-95
            disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none;
   }
 
   /* Botón secundario */
   .btn-secondary {
     @apply inline-flex items-center justify-center gap-2
-           bg-surface hover:bg-brand-50 dark:hover:bg-brand-900/20
-           text-foreground font-medium rounded-xl px-5 py-2.5
-           border border-border hover:border-brand-300
-           transition-all duration-150
+           bg-surface hover:bg-brand-50 dark:hover:bg-brand-900/10
+           text-foreground font-bold rounded-2xl px-6 py-3
+           border border-border hover:border-brand-400
+           transition-all duration-200
            disabled:opacity-50 disabled:cursor-not-allowed;
-  }
-
-  /* Botón ghost */
-  .btn-ghost {
-    @apply inline-flex items-center justify-center gap-2
-           text-muted-foreground hover:text-foreground
-           hover:bg-muted rounded-lg px-3 py-2
-           transition-all duration-150;
   }
 
   /* Input base */
   .input-base {
-    @apply w-full rounded-xl border border-border bg-card
-           px-4 py-2.5 text-sm text-foreground
-           placeholder:text-muted-foreground
-           outline-none
-           focus:ring-2 focus:ring-brand-600/30 focus:border-brand-600
-           transition-all duration-150
+    @apply w-full rounded-2xl border border-border bg-surface/50
+           px-5 py-3.5 text-sm text-foreground
+           placeholder:text-muted-foreground/60
+           outline-none ring-offset-background
+           focus:ring-2 focus:ring-brand-600/20 focus:border-brand-600
+           transition-all duration-200
            disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
   /* Badge de estado */
   .badge {
-    @apply inline-flex items-center gap-1 rounded-full text-xs font-semibold px-2.5 py-0.5;
+    @apply inline-flex items-center gap-1 rounded-xl text-[10px] font-bold uppercase tracking-wider px-3 py-1;
   }
 
   /* NavLink activo del sidebar */

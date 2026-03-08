@@ -50,7 +50,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   }, [supabase, router])
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <div className="flex h-screen overflow-hidden bg-background bg-gradient-to-br from-brand-100/30 via-background to-background">
       <Sidebar 
         open={sidebarOpen} 
         onClose={() => setSidebarOpen(false)} 

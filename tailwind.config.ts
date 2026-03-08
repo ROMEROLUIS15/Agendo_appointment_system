@@ -10,28 +10,20 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // ── Naranja Fuego (marca principal) ───────────────────
+        // ── Sandstone Premium (marca principal) ───────────────────
         brand: {
-          50:  '#FFF7ED',
-          100: '#FFEDD5',
-          200: '#FED7AA',
-          300: '#FDBA74',
-          400: '#FB923C',
-          500: '#F97316',
-          600: '#EA580C', // ← primary: botones, links, iconos activos
-          700: '#C2410C',
-          800: '#9A3412',
-          900: '#7C2D12',
+          50:  '#FAF9F6',
+          100: '#F4F1EA',
+          200: '#E6DAC8',
+          300: '#DCD2C8',
+          400: '#CBB9A4',
+          500: '#B8A692',
+          600: '#A48D78', // ← primary: botones, links, iconos activos
+          700: '#8C7765',
+          800: '#756253',
+          900: '#5D4F42',
         },
-        // ── Neutros cálidos (fondos y textos) ─────────────────
-        warm: {
-          50:  '#FFFBF7',
-          100: '#FEF3C7',
-          200: '#FDE68A',
-          800: '#3D1F00',
-          900: '#1C0A00',
-        },
-        // ── Tokens semánticos (resuelven en CSS vars) ─────────
+        // ── Neutros y Semánticos ─────────────────
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
         surface:    'hsl(var(--surface))',
@@ -48,11 +40,11 @@ const config: Config = {
           DEFAULT:    'hsl(var(--primary))',
           foreground: 'hsl(var(--primary-foreground))',
         },
-        // Semánticos de estado
-        success:   '#22C55E',
-        warning:   '#EAB308',
-        danger:    '#EF4444',
-        info:      '#3B82F6',
+        // Semánticos adaptados al tema Beige
+        success:   '#728C6E',
+        warning:   '#C5A059',
+        danger:    '#A65D57',
+        info:      '#6E87A6',
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
@@ -65,11 +57,11 @@ const config: Config = {
         '4xl': '2rem',
       },
       boxShadow: {
-        'brand-sm': '0 1px 3px rgba(234, 88, 12, 0.12)',
-        'brand-md': '0 4px 12px rgba(234, 88, 12, 0.18)',
-        'brand-lg': '0 8px 30px rgba(234, 88, 12, 0.22)',
-        'card':     '0 2px 8px rgba(0, 0, 0, 0.06)',
-        'card-dark':'0 2px 8px rgba(0, 0, 0, 0.35)',
+        'brand-sm': '0 1px 3px rgba(164, 141, 120, 0.12)',
+        'brand-md': '0 4px 12px rgba(164, 141, 120, 0.18)',
+        'brand-lg': '0 8px 30px rgba(164, 141, 120, 0.22)',
+        'card':     '0 4px 20px rgba(164, 141, 120, 0.05)',
+        'card-dark':'0 4px 20px rgba(0, 0, 0, 0.35)',
       },
       animation: {
         'fade-in':      'fadeIn 0.25s ease-out',
@@ -87,8 +79,8 @@ const config: Config = {
           to:   { opacity: '1', transform: 'translateY(0)' },
         },
         pulseBrand: {
-          '0%, 100%': { boxShadow: '0 0 0 0 rgba(234,88,12,0.4)' },
-          '50%':      { boxShadow: '0 0 0 8px rgba(234,88,12,0)' },
+          '0%, 100%': { boxShadow: '0 0 0 0 rgba(164,141,120,0.4)' },
+          '50%':      { boxShadow: '0 0 0 8px rgba(164,141,120,0)' },
         },
       },
     },

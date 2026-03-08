@@ -26,9 +26,9 @@ export function Topbar({ title, subtitle, actions, onMenuClick, user }: TopbarPr
 
       {/* Title */}
       <div className="flex-1 min-w-0">
-        <h1 className="text-base font-semibold text-foreground truncate">{title}</h1>
+        <h1 className="text-lg font-extrabold text-foreground tracking-tight leading-none">{title}</h1>
         {subtitle && (
-          <p className="text-xs text-muted-foreground">{subtitle}</p>
+          <p className="text-[11px] font-medium text-muted-foreground mt-1 uppercase tracking-wider">{subtitle}</p>
         )}
       </div>
 

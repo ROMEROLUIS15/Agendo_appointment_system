@@ -1,4 +1,4 @@
-﻿import type { Metadata } from 'next'
+import type { Metadata } from 'next'
 import {
   CalendarDays, Users, DollarSign, TrendingUp,
   Plus, ArrowRight
@@ -31,10 +31,18 @@ export default async function DashboardPage() {
             Tu perfil aún no está vinculado a un negocio. Esto puede suceder si el registro no se completó correctamente.
           </p>
           <div className="flex flex-col gap-3">
-            <Button className="w-full">Completar Perfil</Button>
-            <Link href="/login" className="text-sm text-brand-600 hover:underline">
-              Volver a iniciar sesión
+            <Link href="/dashboard/setup" className="w-full">
+              <Button className="w-full">Completar Perfil</Button>
             </Link>
+            <form action={async () => {
+              'use server'
+              const { signout } = await import('@/app/login/actions')
+              await signout()
+            }}>
+              <button type="submit" className="text-sm text-brand-600 hover:underline w-full">
+                Volver a iniciar sesión
+              </button>
+            </form>
           </div>
         </div>
       </div>
@@ -56,7 +64,7 @@ export default async function DashboardPage() {
     `)
     .eq('business_id', session.business_id)
     .gte('start_at', todayStart)
-    .lt('start_at', todayEnd)
+    .lte('start_at', todayEnd) // Changed to lte for inclusive today
     .order('start_at', { ascending: true })
 
   const stats = mockDashboardStats
@@ -107,29 +115,29 @@ export default async function DashboardPage() {
                 </div>
               ) : (
                 todayAppointments.map((apt: any) => ( // Corregido: apt: any evita el error de tipo implícito
-                  <div key={apt.id} className="flex items-center gap-4 p-4 rounded-2xl border border-border hover:border-brand-200 hover:bg-surface transition-all duration-150 group">
-                    <div className="text-center w-12 flex-shrink-0">
-                      <p className="text-sm font-bold text-foreground">{formatTime(apt.start_at)}</p>
-                      <p className="text-[10px] text-muted-foreground">{formatTime(apt.end_at)}</p>
+                  <div key={apt.id} className="flex items-center gap-4 p-4 rounded-3xl border border-border/60 hover:border-brand-400 hover:bg-brand-50/50 transition-all duration-300 group shadow-sm hover:shadow-md">
+                    <div className="text-center w-14 flex-shrink-0">
+                      <p className="text-sm font-extrabold text-foreground">{formatTime(apt.start_at)}</p>
+                      <p className="text-[10px] font-medium text-muted-foreground">{formatTime(apt.end_at)}</p>
                     </div>
                     <div
-                      className="w-1 h-10 rounded-full flex-shrink-0"
+                      className="w-1.5 h-12 rounded-full flex-shrink-0"
                       style={{ backgroundColor: (apt.service as any)?.color ?? '#ccc' }}
                     />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <p className="text-sm font-semibold text-foreground">
+                        <p className="text-sm font-bold text-foreground group-hover:text-brand-600 transition-colors">
                           {(apt.client as any)?.name ?? 'Cliente desconocido'}
                         </p>
                         {apt.is_dual_booking && <DualBookingBadge />}
                       </div>
-                      <p className="text-xs text-muted-foreground mt-0.5">
+                      <p className="text-xs font-medium text-muted-foreground mt-0.5">
                         {(apt.service as any)?.name} · {(apt.service as any)?.duration_min} min · {(apt.assigned_user as any)?.name ?? 'Sin asignar'}
                       </p>
                     </div>
                     <div className="flex flex-col items-end gap-1.5">
                       <AppointmentStatusBadge status={(apt.status ?? 'pending') as AppointmentStatus} />
-                      <p className="text-xs font-medium text-foreground">
+                      <p className="text-sm font-extrabold text-foreground">
                         {formatCurrency((apt.service as any)?.price ?? 0)}
                       </p>
                     </div>

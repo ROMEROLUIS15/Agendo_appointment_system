@@ -49,30 +49,30 @@ export function Sidebar({ open = true, onClose, user, business }: SidebarProps) 
         )}
       >
         {/* Logo */}
-        <div className="flex items-center justify-between px-5 py-5 border-b border-border">
-          <Link href="/dashboard" className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-600 shadow-brand-md">
-              <Scissors size={18} className="text-white rotate-45" />
+        <div className="flex items-center justify-between px-5 py-6 border-b border-border/50">
+          <Link href="/dashboard" className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-brand-600 shadow-brand-lg transition-transform hover:scale-105 active:scale-95">
+              <Scissors size={20} className="text-white rotate-45" />
             </div>
             <div>
-              <span className="text-lg font-bold text-foreground tracking-tight">Agendo</span>
-              <p className="text-[10px] text-brand-600 font-medium -mt-0.5">Pro Plan</p>
+              <span className="text-xl font-extrabold text-foreground tracking-tight">Agendo</span>
+              <p className="text-[10px] text-brand-600 font-bold tracking-wider uppercase -mt-1">Premium</p>
             </div>
           </Link>
           {/* Mobile close button */}
           {onClose && (
-            <button className="btn-ghost p-1 lg:hidden" onClick={onClose} aria-label="Cerrar menú">
-              <X size={18} />
+            <button className="btn-ghost p-1.5 lg:hidden text-muted-foreground hover:text-foreground" onClick={onClose} aria-label="Cerrar menú">
+              <X size={20} />
             </button>
           )}
         </div>
 
         {/* Business info */}
         {business && (
-          <div className="px-4 py-3 mx-3 mt-3 rounded-2xl bg-brand-50 dark:bg-brand-900/20">
-            <p className="text-xs text-muted-foreground font-medium">Negocio activo</p>
-            <p className="text-sm font-semibold text-foreground mt-0.5">{business.name}</p>
-            <p className="text-xs text-muted-foreground">{business.category || 'Servicios'}</p>
+          <div className="px-4 py-4 mx-4 mt-6 rounded-2xl bg-brand-50/50 dark:bg-brand-900/10 border border-brand-100/50 dark:border-brand-800/10">
+            <p className="text-[10px] text-brand-600 font-extrabold uppercase tracking-widest mb-1.5 opacity-80">Negocio activo</p>
+            <p className="text-sm font-bold text-foreground leading-tight">{business.name}</p>
+            <p className="text-xs text-muted-foreground font-medium mt-0.5">{business.category || 'Servicios'}</p>
           </div>
         )}
 
@@ -106,16 +106,39 @@ export function Sidebar({ open = true, onClose, user, business }: SidebarProps) 
 
         {/* User profile at bottom */}
         {user && (
-          <div className="px-3 py-4 border-t border-border">
-            <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-surface">
-              <div className="h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold"
-                style={{ backgroundColor: user.color || '#F0FDF4', color: user.color ? '#FFF' : '#16a34a' }}>
-                {user.name?.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() || 'U'}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-foreground truncate">{user.name}</p>
-                <p className="text-xs text-muted-foreground capitalize">{user.role}</p>
-              </div>
+          <div className="px-3 py-4 border-t border-border mt-auto">
+            <div className="flex flex-col gap-2">
+              <Link 
+                href="/dashboard/profile"
+                className={cn(
+                  "flex items-center gap-3 px-3 py-2.5 rounded-xl bg-surface hover:bg-brand-50/50 dark:hover:bg-brand-900/10 transition-colors group",
+                  pathname === '/dashboard/profile' && "ring-1 ring-brand-600 bg-brand-50"
+                )}
+              >
+                <div 
+                  className="h-9 w-9 rounded-full flex items-center justify-center text-xs font-bold shrink-0 border border-border"
+                  style={{ backgroundColor: user.color || '#F0FDF4', color: user.color ? '#FFF' : '#16a34a' }}
+                >
+                  {user.name?.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() || 'U'}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-foreground truncate group-hover:text-brand-600">{user.name}</p>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{user.role}</p>
+                </div>
+              </Link>
+              
+              <form action={async () => {
+                const { signout } = await import('@/app/login/actions')
+                await signout()
+              }}>
+                <button 
+                  type="submit"
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-bold text-danger bg-danger/5 hover:bg-danger/10 border border-danger/20 rounded-xl transition-all active:scale-[0.98]"
+                >
+                  <LogOut size={14} />
+                  Cerrar sesión
+                </button>
+              </form>
             </div>
           </div>
         )}
@@ -123,3 +146,5 @@ export function Sidebar({ open = true, onClose, user, business }: SidebarProps) 
     </>
   )
 }
+
+import { LogOut } from 'lucide-react'

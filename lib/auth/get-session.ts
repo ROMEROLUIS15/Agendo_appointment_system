@@ -1,4 +1,4 @@
-﻿import { createClient } from '@/lib/supabase/server'
+import { createClient } from '@/lib/supabase/server'
 
 export async function getSession() {
   try {
@@ -18,8 +18,13 @@ export async function getSession() {
       .eq('id', user.id) // Filtra exactamente por el ID del que inició sesión
       .maybeSingle()
 
-    if (dbError || !dbUser) {
-      // Si el usuario existe en Auth pero no en nuestra tabla de DB aún
+    if (dbError) {
+      console.error('Error fetching dbUser in getSession:', dbError.message)
+      // Si hay error de base de datos (como recursión de RLS), devolvemos el usuario de auth sin dbUser
+      return { ...user, dbUser: null, business_id: null, error: dbError.message }
+    }
+
+    if (!dbUser) {
       return { ...user, dbUser: null, business_id: null }
     }
 
@@ -29,7 +34,7 @@ export async function getSession() {
       business_id: dbUser.business_id
     }
   } catch (e) {
-    console.error('Error en getSession:', e)
+    console.error('Critical failure in getSession:', e)
     return null
   }
 }

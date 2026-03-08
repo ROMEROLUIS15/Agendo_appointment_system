@@ -8,7 +8,7 @@ export const CreateClientSchema = z.object({
     .regex(/^\+?[1-9]\d{7,14}$/, 'Número inválido')
     .optional()
     .or(z.literal('')),
-  email:    z.string().email('Email inválido').optional().or(z.literal('')),
+  email:    z.string().email('Email inválido').nullable().optional().or(z.literal('')),
   birthday: z.coerce.date().optional(),
   notes:    z.string().max(1000).optional(),
   tags:     z.array(z.string().min(1).max(30)).max(10, 'Máximo 10 etiquetas').default([]),

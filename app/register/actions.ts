@@ -1,17 +1,22 @@
-﻿'use server'
+'use server'
 
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import { registerSchema } from '@/lib/validations/auth'
 
 export async function register(formData: FormData) {
+  const data = Object.fromEntries(formData.entries())
+  
+  // 0. Validar datos en el servidor
+  const result = registerSchema.safeParse(data)
+  if (!result.success) {
+    return { error: result.error?.errors?.[0]?.message || 'Datos de registro inválidos' }
+  }
+
+  const { firstName, lastName, bizName, email, password } = result.data
+
   // Inicializamos el cliente con await para manejar las cookies correctamente
   const supabase = await createClient()
-
-  const firstName = formData.get('firstName') as string
-  const lastName = formData.get('lastName') as string
-  const bizName = formData.get('bizName') as string
-  const email = formData.get('email') as string
-  const password = formData.get('password') as string
 
   // 1. Crear el usuario en el sistema de Autenticación de Supabase
   const { data: authData, error: authError } = await supabase.auth.signUp({
