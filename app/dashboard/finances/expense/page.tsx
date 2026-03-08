@@ -11,10 +11,14 @@ import { formatCurrency, formatDate, expenseCategoryLabels } from '@/lib/utils'
 export default function ExpensesPage() {
   const [query, setQuery] = useState('')
 
-  const filtered = mockExpenses.filter((e) =>
-    (e.description ?? '').toLowerCase().includes(query.toLowerCase()) ||
-    e.category.toLowerCase().includes(query.toLowerCase())
-  )
+  // Corregido: Blindaje total contra valores null/undefined para que Vercel compile con éxito
+  const filtered = mockExpenses.filter((e) => {
+    const q = query.toLowerCase()
+    const description = (e.description ?? '').toLowerCase()
+    const category = (e.category ?? '').toLowerCase()
+    
+    return description.includes(q) || category.includes(q)
+  })
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -36,9 +40,11 @@ export default function ExpensesPage() {
       <div className="relative max-w-md">
         <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
         <input
-          type="text" placeholder="Buscar gasto..."
-          value={query} onChange={(e) => setQuery(e.target.value)}
-          className="input-base pl-10"
+          type="text" 
+          placeholder="Buscar gasto..."
+          value={query} 
+          onChange={(e) => setQuery(e.target.value)}
+          className="input-base pl-10 w-full"
         />
       </div>
 
@@ -47,6 +53,11 @@ export default function ExpensesPage() {
           <div className="text-center py-16">
             <Receipt size={40} className="text-muted-foreground mx-auto mb-3 opacity-40" />
             <p className="text-muted-foreground">No se encontraron gastos para &quot;{query}&quot;</p>
+            {query && (
+              <Button variant="ghost" size="sm" className="mt-2" onClick={() => setQuery('')}>
+                Limpiar búsqueda
+              </Button>
+            )}
           </div>
         ) : (
           <div className="divide-y divide-border">
@@ -57,14 +68,15 @@ export default function ExpensesPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-foreground">
-                    {expenseCategoryLabels[exp.category]}
+                    {/* Verificación de seguridad para la etiqueta de categoría */}
+                    {(expenseCategoryLabels as any)[exp.category] ?? exp.category ?? 'Gasto General'}
                   </p>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    {formatDate(exp.expense_date, 'd MMM yyyy')} · {exp.description ?? '—'}
+                    {formatDate(exp.expense_date, 'd MMM yyyy')} · {exp.description ?? 'Sin descripción'}
                   </p>
                 </div>
                 <div className="text-right flex-shrink-0">
-                  <p className="text-base font-bold text-red-600">-{formatCurrency(exp.amount)}</p>
+                  <p className="text-base font-bold text-red-600">-{formatCurrency(exp.amount ?? 0)}</p>
                 </div>
               </div>
             ))}
