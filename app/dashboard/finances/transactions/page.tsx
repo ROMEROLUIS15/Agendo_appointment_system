@@ -11,8 +11,8 @@ import { formatCurrency, formatDate, paymentMethodLabels } from '@/lib/utils'
 export default function TransactionsPage() {
   const [query, setQuery] = useState('')
 
-  const filtered = mockTransactions.filter((t) => 
-    t.description?.toLowerCase().includes(query.toLowerCase()) ||
+  const filtered = mockTransactions.filter((t) =>
+    (t.notes ?? '').toLowerCase().includes(query.toLowerCase()) ||
     t.method.toLowerCase().includes(query.toLowerCase())
   )
 
@@ -33,19 +33,15 @@ export default function TransactionsPage() {
         </Link>
       </div>
 
-      {/* Search */}
       <div className="relative max-w-md">
         <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
         <input
-          type="text"
-          placeholder="Buscar transacción..."
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          type="text" placeholder="Buscar transacción..."
+          value={query} onChange={(e) => setQuery(e.target.value)}
           className="input-base pl-10"
         />
       </div>
 
-      {/* List */}
       <Card className="p-0 overflow-hidden">
         {filtered.length === 0 ? (
           <div className="text-center py-16">
@@ -64,13 +60,13 @@ export default function TransactionsPage() {
                     {paymentMethodLabels[txn.method]}
                   </p>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    {formatDate(txn.paidAt, 'd MMM yyyy, HH:mm')} 
-                    {txn.description && ` · ${txn.description}`}
+                    {txn.paid_at ? formatDate(txn.paid_at, 'd MMM yyyy, HH:mm') : '—'}
+                    {txn.notes && ` · ${txn.notes}`}
                   </p>
                 </div>
                 <div className="text-right flex-shrink-0">
-                  <p className="text-base font-bold text-green-600">+{formatCurrency(txn.netAmount)}</p>
-                  {txn.discount > 0 && (
+                  <p className="text-base font-bold text-green-600">+{formatCurrency(txn.net_amount)}</p>
+                  {(txn.discount ?? 0) > 0 && (
                     <p className="text-xs text-muted-foreground">Desc. {txn.discount}%</p>
                   )}
                 </div>

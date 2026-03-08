@@ -14,17 +14,15 @@ export default function ClientDetailPage({ params }: Props) {
   const client = mockClients.find((c) => c.id === params.id)
   if (!client) return notFound()
 
-  const clientAppointments = mockAppointments.filter((a) => a.clientId === client.id)
-  const isVIP = client.tags.includes('VIP')
+  const clientAppointments = mockAppointments.filter((a) => a.client_id === client.id)
+  const isVIP = (client.tags ?? []).includes('VIP')
 
   return (
     <div className="space-y-6 animate-fade-in max-w-3xl">
-      {/* Back */}
       <Link href="/dashboard/clients" className="btn-ghost inline-flex text-sm gap-2 text-muted-foreground hover:text-foreground">
         <ArrowLeft size={16} /> Volver a Clientes
       </Link>
 
-      {/* Profile header */}
       <Card>
         <div className="flex items-start gap-4">
           <Avatar name={client.name} size="xl" />
@@ -49,10 +47,10 @@ export default function ClientDetailPage({ params }: Props) {
                 </a>
               )}
             </div>
-            {client.tags.length > 0 && (
+            {(client.tags ?? []).length > 0 && (
               <div className="flex items-center gap-1.5 mt-3">
                 <Tag size={12} className="text-muted-foreground" />
-                {client.tags.map((tag) => (
+                {(client.tags ?? []).map((tag) => (
                   <Badge key={tag} variant="brand">{tag}</Badge>
                 ))}
               </div>
@@ -62,28 +60,28 @@ export default function ClientDetailPage({ params }: Props) {
         </div>
       </Card>
 
-      {/* Metrics */}
       <div className="grid grid-cols-3 gap-4">
         <Card className="text-center p-4">
           <Calendar size={20} className="text-brand-600 mx-auto mb-2" />
-          <p className="text-2xl font-bold text-foreground">{client.total_appointments}</p>
+          <p className="text-2xl font-bold text-foreground">{client.total_appointments ?? 0}</p>
           <p className="text-xs text-muted-foreground">Visitas totales</p>
         </Card>
         <Card className="text-center p-4">
           <DollarSign size={20} className="text-brand-600 mx-auto mb-2" />
-          <p className="text-2xl font-bold text-foreground">{formatCurrency(client.total_spent || 0)}</p>
+          <p className="text-2xl font-bold text-foreground">{formatCurrency(client.total_spent ?? 0)}</p>
           <p className="text-xs text-muted-foreground">Gasto total</p>
         </Card>
         <Card className="text-center p-4">
           <DollarSign size={20} className="text-brand-600 mx-auto mb-2" />
           <p className="text-2xl font-bold text-foreground">
-            {formatCurrency((client.total_appointments || 0) > 0 ? (client.total_spent || 0) / (client.total_appointments || 1) : 0)}
+            {formatCurrency((client.total_appointments ?? 0) > 0
+              ? (client.total_spent ?? 0) / (client.total_appointments ?? 1)
+              : 0)}
           </p>
           <p className="text-xs text-muted-foreground">Ticket promedio</p>
         </Card>
       </div>
 
-      {/* Appointment history */}
       <Card>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-base font-semibold text-foreground">Historial de Citas</h2>
@@ -100,20 +98,22 @@ export default function ClientDetailPage({ params }: Props) {
           <div className="space-y-3">
             {clientAppointments.map((apt) => (
               <div key={apt.id} className="flex items-center gap-4 p-3 rounded-xl bg-surface">
-                <div className="w-1 h-10 rounded-full flex-shrink-0" style={{ backgroundColor: apt.service.color }} />
+                <div className="w-1 h-10 rounded-full flex-shrink-0"
+                  style={{ backgroundColor: apt.service?.color ?? '#ccc' }} />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-foreground">{apt.service.name}</p>
-                  <p className="text-xs text-muted-foreground">{formatDate(apt.startAt, 'd MMM yyyy, HH:mm')}</p>
+                  <p className="text-sm font-medium text-foreground">{apt.service?.name ?? '—'}</p>
+                  <p className="text-xs text-muted-foreground">{formatDate(apt.start_at, 'd MMM yyyy, HH:mm')}</p>
                 </div>
-                <AppointmentStatusBadge status={apt.status} />
-                <p className="text-sm font-semibold text-foreground">{formatCurrency(apt.service.price)}</p>
+                <AppointmentStatusBadge status={(apt.status ?? 'pending')} />
+                <p className="text-sm font-semibold text-foreground">
+                  {formatCurrency(apt.service?.price ?? 0)}
+                </p>
               </div>
             ))}
           </div>
         )}
       </Card>
 
-      {/* Notes */}
       {client.notes && (
         <Card>
           <h2 className="text-base font-semibold text-foreground mb-3">Notas internas</h2>

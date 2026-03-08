@@ -1,12 +1,17 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { ArrowLeft, UserPlus, Tag } from 'lucide-react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { createClient } from '@/lib/supabase/client'
 
 export default function NewClientPage() {
+  const router = useRouter()
+  const supabase = createClient()
+  const [businessId, setBusinessId] = useState<string | null>(null)
   const [form, setForm] = useState({
     name:  '',
     phone: '',
@@ -16,12 +21,43 @@ export default function NewClientPage() {
   })
   const [saving, setSaving] = useState(false)
 
+  useEffect(() => {
+    async function getBusinessId() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data: dbUser } = await supabase
+        .from('users').select('business_id').eq('id', user.id).single()
+      if (dbUser?.business_id) setBusinessId(dbUser.business_id)
+    }
+    getBusinessId()
+  }, [])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!businessId) return
     setSaving(true)
-    await new Promise((r) => setTimeout(r, 1000))
+
+    const tags = form.tags
+      ? form.tags.split(',').map((t) => t.trim()).filter(Boolean)
+      : []
+
+    const { error } = await supabase.from('clients').insert({
+      business_id: businessId,
+      name:        form.name,
+      phone:       form.phone || null,
+      email:       form.email || null,
+      notes:       form.notes || null,
+      tags,
+    })
+
     setSaving(false)
-    alert('✅ Cliente creado correctamente')
+
+    if (error) {
+      alert('Error al crear el cliente: ' + error.message)
+    } else {
+      router.push('/dashboard/clients')
+      router.refresh()
+    }
   }
 
   return (
@@ -58,7 +94,7 @@ export default function NewClientPage() {
                 placeholder="Ej. Juan Pérez"
               />
             </div>
-            
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1.5" htmlFor="client-phone">
@@ -120,7 +156,6 @@ export default function NewClientPage() {
           </div>
         </Card>
 
-        {/* Actions */}
         <div className="flex items-center justify-end gap-3">
           <Link href="/dashboard/clients">
             <Button variant="secondary" type="button">Cancelar</Button>

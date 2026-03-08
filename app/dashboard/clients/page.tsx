@@ -23,7 +23,7 @@ export default function ClientsPage() {
         c.name.toLowerCase().includes(q) ||
         c.phone?.includes(q) ||
         c.email?.toLowerCase().includes(q) ||
-        c.tags.some((t) => t.toLowerCase().includes(q))
+        (c.tags ?? []).some((t) => t.toLowerCase().includes(q))
     )
   }, [query])
 
@@ -56,9 +56,9 @@ export default function ClientsPage() {
       {/* Stats summary row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
-          { label: 'Total clientes',  value: mockClients.length,                             icon: '👥' },
-          { label: 'VIP',            value: mockClients.filter(c => c.tags.includes('VIP')).length, icon: '⭐' },
-          { label: 'Activos 30 días', value: 4,                                              icon: '📅' },
+          { label: 'Total clientes', value: mockClients.length, icon: '👥' },
+          { label: 'VIP', value: mockClients.filter(c => (c.tags ?? []).includes('VIP')).length, icon: '⭐' },
+          { label: 'Activos 30 días', value: 4, icon: '📅' },
           { label: 'Gasto promedio', value: formatCurrency(mockClients.reduce((s,c) => s + (c.total_spent || 0), 0) / mockClients.length), icon: '💰' },
         ].map((s) => (
           <div key={s.label} className="card-base text-center p-4">
@@ -106,7 +106,7 @@ export default function ClientsPage() {
 }
 
 function ClientRow({ client }: { client: Client }) {
-  const isVIP = client.tags.includes('VIP')
+  const isVIP = (client.tags ?? []).includes('VIP')
 
   return (
     <Link
@@ -126,7 +126,7 @@ function ClientRow({ client }: { client: Client }) {
             </span>
           )}
           <div className="flex gap-1 flex-wrap">
-            {client.tags.filter(t => t !== 'VIP').map((tag) => (
+            {(client.tags ?? []).filter(t => t !== 'VIP').map((tag) => (
               <Badge key={tag} variant="brand" className="text-[10px] px-1.5 py-0">
                 {tag}
               </Badge>

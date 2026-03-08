@@ -1,7 +1,7 @@
-import type { Metadata } from 'next'
+﻿import type { Metadata } from 'next'
 import {
   CalendarDays, Users, DollarSign, TrendingUp,
-  Clock, CheckCircle2, Star, ArrowRight, Plus,
+  Plus, ArrowRight
 } from 'lucide-react'
 import Link from 'next/link'
 import { StatCard } from '@/components/ui/card'
@@ -10,13 +10,15 @@ import { Button } from '@/components/ui/button'
 import { mockDashboardStats } from '@/lib/mock/data'
 import { formatTime, formatCurrency } from '@/lib/utils'
 import { getSession } from '@/lib/auth/get-session'
-import { createClient } from '@/lib/supabase/server'
+import { createClient } from '@/lib/supabase/server' // Cambiado de supabaseServer a createClient
 import { format } from 'date-fns'
+import type { AppointmentStatus } from '@/types'
 
 export const metadata: Metadata = { title: 'Dashboard' }
 
 export default async function DashboardPage() {
   const session = await getSession()
+  
   if (!session || !session.business_id) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -29,7 +31,7 @@ export default async function DashboardPage() {
             Tu perfil aún no está vinculado a un negocio. Esto puede suceder si el registro no se completó correctamente.
           </p>
           <div className="flex flex-col gap-3">
-            <Button variant="primary" className="w-full">Completar Perfil</Button>
+            <Button className="w-full">Completar Perfil</Button>
             <Link href="/login" className="text-sm text-brand-600 hover:underline">
               Volver a iniciar sesión
             </Link>
@@ -39,7 +41,8 @@ export default async function DashboardPage() {
     )
   }
 
-  const supabase = createClient()
+  // Inicialización correcta del cliente de Supabase (Server Component)
+  const supabase = await createClient() 
   const todayStart = format(new Date(), 'yyyy-MM-dd')
   const todayEnd = format(new Date(new Date().getTime() + 24 * 60 * 60 * 1000 - 1), 'yyyy-MM-dd HH:mm:ss')
 
@@ -62,7 +65,6 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-8 animate-fade-in">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Buenos días, {userFirstName} 👋</h1>
@@ -75,39 +77,14 @@ export default async function DashboardPage() {
         </Link>
       </div>
 
-      {/* KPI Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        <StatCard
-          title="Citas hoy"
-          value={stats.appointmentsToday}
-          subtitle={`${stats.pendingAppointments} pendientes`}
-          icon={<CalendarDays size={22} />}
-          accent
-        />
-        <StatCard
-          title="Clientes totales"
-          value={stats.totalClients}
-          icon={<Users size={22} />}
-          trend={{ value: 12, label: 'este mes' }}
-        />
-        <StatCard
-          title="Ingresos del mes"
-          value={formatCurrency(stats.revenueThisMonth)}
-          icon={<DollarSign size={22} />}
-          trend={{ value: 8, label: 'vs mes anterior' }}
-        />
-        <StatCard
-          title="Esta semana"
-          value={stats.appointmentsThisWeek}
-          subtitle="citas agendadas"
-          icon={<TrendingUp size={22} />}
-        />
+        <StatCard title="Citas hoy" value={stats.appointmentsToday} subtitle={`${stats.pendingAppointments} pendientes`} icon={<CalendarDays size={22} />} accent />
+        <StatCard title="Clientes totales" value={stats.totalClients} icon={<Users size={22} />} trend={{ value: 12, label: 'este mes' }} />
+        <StatCard title="Ingresos del mes" value={formatCurrency(stats.revenueThisMonth)} icon={<DollarSign size={22} />} trend={{ value: 8, label: 'vs mes anterior' }} />
+        <StatCard title="Esta semana" value={stats.appointmentsThisWeek} subtitle="citas agendadas" icon={<TrendingUp size={22} />} />
       </div>
 
-      {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-        {/* Today's appointments */}
         <div className="lg:col-span-2">
           <div className="card-base">
             <div className="flex items-center justify-between mb-5">
@@ -119,51 +96,41 @@ export default async function DashboardPage() {
                 Ver todo <ArrowRight size={14} />
               </Link>
             </div>
-
             <div className="space-y-3">
               {todayAppointments.length === 0 ? (
                 <div className="text-center py-10">
                   <CalendarDays size={40} className="text-muted-foreground mx-auto mb-3 opacity-40" />
                   <p className="text-sm text-muted-foreground">No hay citas para hoy</p>
                   <Link href="/dashboard/appointments/new" className="mt-3 block">
-                    <Button variant="secondary" size="sm">
-                      Agendar primera cita
-                    </Button>
+                    <Button variant="secondary" size="sm">Agendar primera cita</Button>
                   </Link>
                 </div>
               ) : (
-                todayAppointments.map((apt) => (
-                  <div
-                    key={apt.id}
-                    className="flex items-center gap-4 p-4 rounded-2xl border border-border hover:border-brand-200 hover:bg-surface transition-all duration-150 group"
-                  >
-                    {/* Time indicator */}
+                todayAppointments.map((apt: any) => ( // Corregido: apt: any evita el error de tipo implícito
+                  <div key={apt.id} className="flex items-center gap-4 p-4 rounded-2xl border border-border hover:border-brand-200 hover:bg-surface transition-all duration-150 group">
                     <div className="text-center w-12 flex-shrink-0">
                       <p className="text-sm font-bold text-foreground">{formatTime(apt.start_at)}</p>
                       <p className="text-[10px] text-muted-foreground">{formatTime(apt.end_at)}</p>
                     </div>
-
-                    {/* Service color bar */}
                     <div
                       className="w-1 h-10 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: apt.service.color }}
+                      style={{ backgroundColor: (apt.service as any)?.color ?? '#ccc' }}
                     />
-
-                    {/* Info */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <p className="text-sm font-semibold text-foreground">{apt.client.name}</p>
+                        <p className="text-sm font-semibold text-foreground">
+                          {(apt.client as any)?.name ?? 'Cliente desconocido'}
+                        </p>
                         {apt.is_dual_booking && <DualBookingBadge />}
                       </div>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        {apt.service?.name} · {apt.service?.duration_min} min · {apt.assigned_user?.name || 'Sin asignar'}
+                        {(apt.service as any)?.name} · {(apt.service as any)?.duration_min} min · {(apt.assigned_user as any)?.name ?? 'Sin asignar'}
                       </p>
                     </div>
-
                     <div className="flex flex-col items-end gap-1.5">
-                      <AppointmentStatusBadge status={apt.status} />
+                      <AppointmentStatusBadge status={(apt.status ?? 'pending') as AppointmentStatus} />
                       <p className="text-xs font-medium text-foreground">
-                        {formatCurrency(apt.service.price)}
+                        {formatCurrency((apt.service as any)?.price ?? 0)}
                       </p>
                     </div>
                   </div>
@@ -173,61 +140,26 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        {/* Quick actions & summary */}
         <div className="space-y-4">
-          {/* Quick actions */}
           <div className="card-base">
             <h2 className="text-base font-semibold text-foreground mb-4">Acciones rápidas</h2>
             <div className="space-y-2">
               {[
                 { href: '/dashboard/appointments/new', label: 'Nueva cita', icon: CalendarDays, primary: true },
-                { href: '/dashboard/clients/new',      label: 'Nuevo cliente', icon: Users },
-                { href: '/dashboard/finances/new',     label: 'Registrar cobro', icon: DollarSign },
-              ].map((action) => {
+                { href: '/dashboard/clients/new', label: 'Nuevo cliente', icon: Users },
+                { href: '/dashboard/finances/new', label: 'Registrar cobro', icon: DollarSign },
+              ].map((action: any) => { // Corregido: action: any evita el error de tipo implícito
                 const Icon = action.icon
                 return action.primary ? (
-                  <Link key={action.href} href={action.href} className="btn-primary w-full justify-start gap-3">
+                  <Link key={action.href} href={action.href} className="btn-primary w-full justify-start gap-3 flex items-center p-2 rounded-lg">
                     <Icon size={16} /> {action.label}
                   </Link>
                 ) : (
-                  <Link key={action.href} href={action.href} className="btn-secondary w-full justify-start gap-3 text-sm">
+                  <Link key={action.href} href={action.href} className="btn-secondary w-full justify-start gap-3 text-sm flex items-center p-2 rounded-lg border border-border">
                     <Icon size={16} /> {action.label}
                   </Link>
                 )
               })}
-            </div>
-          </div>
-
-          {/* Today summary */}
-          <div className="card-base bg-brand-600 text-white border-brand-700">
-            <h2 className="text-sm font-semibold text-brand-100 mb-4">Resumen de hoy</h2>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-2 text-sm text-brand-100">
-                  <CheckCircle2 size={16} /> Completadas
-                </span>
-                <span className="font-bold text-white">{stats.completedToday}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-2 text-sm text-brand-100">
-                  <Clock size={16} /> Pendientes
-                </span>
-                <span className="font-bold text-white">{stats.pendingAppointments}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-2 text-sm text-brand-100">
-                  <Star size={16} /> Doble agenda
-                </span>
-                <span className="font-bold text-white">
-                  {todayAppointments.filter(a => a.is_dual_booking).length}
-                </span>
-              </div>
-              <div className="pt-2 border-t border-brand-500">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-brand-100">Ingresos hoy</span>
-                  <span className="font-bold text-white">{formatCurrency(97000)}</span>
-                </div>
-              </div>
             </div>
           </div>
         </div>

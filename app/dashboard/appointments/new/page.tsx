@@ -7,61 +7,74 @@ import { useRouter } from 'next/navigation'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { DualBookingBadge } from '@/components/ui/badge'
-import { createClient } from '@/lib/supabase/client'
+import { createClient } from '@/lib/supabase/client'  // ✅ browser client
 import { evaluateDoubleBooking } from '@/lib/appointments/validate-double-booking'
 import type { Client, Service, User } from '@/types'
 
 type DoubleBookingLevel = 'allowed' | 'warn' | 'blocked'
 
-// Mock Tenant ID for Data Guard isolation
-const TENANT_ID = '00000000-0000-0000-0000-000000000000'
-
 export default function NewAppointmentPage() {
   const router = useRouter()
   const supabase = createClient()
 
-  // Form Data
+  // ✅ businessId comes from session, not hardcoded
+  const [businessId, setBusinessId] = useState<string | null>(null)
+
   const [form, setForm] = useState({
-    client_id:       '',
-    service_id:      '',
+    client_id:        '',
+    service_id:       '',
     assigned_user_id: '',
-    start_at:        '',
-    notes:          '',
+    start_at:         '',
+    notes:            '',
   })
 
-  // Reference lists from DB
-  const [clients, setClients] = useState<Client[]>([])
+  const [clients, setClients]   = useState<Client[]>([])
   const [services, setServices] = useState<Service[]>([])
-  const [users, setUsers] = useState<User[]>([])
+  const [users, setUsers]       = useState<User[]>([])
   const [loadingData, setLoadingData] = useState(true)
 
-  // Double Booking State
   const [doubleBookingLevel, setDoubleBookingLevel] = useState<DoubleBookingLevel>('allowed')
   const [doubleBookingMsg, setDoubleBookingMsg]     = useState('')
   const [confirmed, setConfirmed]                   = useState(false)
-  
   const [saving, setSaving] = useState(false)
 
-  // Initial Fetches (Data Guard applied)
+  // ✅ Step 1: get business_id from session, then fetch referentials
   useEffect(() => {
-    async function fetchReferentials() {
+    async function init() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { data: dbUser } = await supabase
+        .from('users')
+        .select('business_id')
+        .eq('id', user.id)
+        .single()
+
+      if (!dbUser?.business_id) {
+        setLoadingData(false)
+        return
+      }
+
+      const bId = dbUser.business_id
+      setBusinessId(bId)
+
       const [clientsRes, servicesRes, usersRes] = await Promise.all([
-        supabase.from('clients').select('*').eq('business_id', TENANT_ID).is('deleted_at', null),
-        supabase.from('services').select('*').eq('business_id', TENANT_ID).eq('is_active', true),
-        supabase.from('users').select('*').eq('business_id', TENANT_ID).eq('is_active', true),
+        supabase.from('clients').select('id, name, phone, email').eq('business_id', bId).is('deleted_at', null),
+        supabase.from('services').select('id, name, duration_min, price').eq('business_id', bId).eq('is_active', true),
+        supabase.from('users').select('id, name').eq('business_id', bId).eq('is_active', true),
       ])
 
-      if (clientsRes.data) setClients(clientsRes.data)
-      if (servicesRes.data) setServices(servicesRes.data)
-      if (usersRes.data) setUsers(usersRes.data)
+      if (clientsRes.data) setClients(clientsRes.data as Client[])
+      if (servicesRes.data) setServices(servicesRes.data as Service[])
+      if (usersRes.data) setUsers(usersRes.data as User[])
       setLoadingData(false)
     }
-    fetchReferentials()
+    init()
   }, [])
 
   const selectedService = services.find((s) => s.id === form.service_id)
 
-  // Double booking check effect
+  // Double booking check
   useEffect(() => {
     async function checkDoubleBooking() {
       if (!form.client_id || !form.start_at) {
@@ -70,10 +83,9 @@ export default function NewAppointmentPage() {
         return
       }
 
-      // Check DB for overlapping on the same day
       const dateStr = form.start_at.split('T')[0]
       const startOfDay = `${dateStr}T00:00:00Z`
-      const endOfDay = `${dateStr}T23:59:59Z`
+      const endOfDay   = `${dateStr}T23:59:59Z`
 
       const { data } = await supabase
         .from('appointments')
@@ -95,37 +107,36 @@ export default function NewAppointmentPage() {
       setConfirmed(false)
     }
 
-    // Debounce or call directly since it's simple
     const timeout = setTimeout(checkDoubleBooking, 500)
     return () => clearTimeout(timeout)
   }, [form.client_id, form.start_at])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!businessId) return
     if (doubleBookingLevel === 'blocked') return
     if (doubleBookingLevel === 'warn' && !confirmed) return
-    
+
     setSaving(true)
-    
-    // Calculate end_at based on service duration
+
     const startObj = new Date(form.start_at)
     const duration = selectedService?.duration_min || 30
-    const endObj = new Date(startObj.getTime() + duration * 60000)
-    
+    const endObj   = new Date(startObj.getTime() + duration * 60000)
+
     const { error } = await supabase.from('appointments').insert({
-      business_id: TENANT_ID,
-      client_id: form.client_id,
-      service_id: form.service_id,
+      business_id:      businessId,  // ✅ real business_id from session
+      client_id:        form.client_id,
+      service_id:       form.service_id,
       assigned_user_id: form.assigned_user_id || null,
-      start_at: startObj.toISOString(),
-      end_at: endObj.toISOString(),
-      notes: form.notes || null,
-      status: 'pending',
-      is_dual_booking: doubleBookingLevel === 'warn',
+      start_at:         startObj.toISOString(),
+      end_at:           endObj.toISOString(),
+      notes:            form.notes || null,
+      status:           'pending',
+      is_dual_booking:  doubleBookingLevel === 'warn',
     })
 
     setSaving(false)
-    
+
     if (error) {
       alert('Error al crear la cita: ' + error.message)
     } else {
@@ -158,9 +169,9 @@ export default function NewAppointmentPage() {
       <form onSubmit={handleSubmit} className="space-y-5">
         <Card>
           <h2 className="text-base font-semibold text-foreground mb-4">Información de la cita</h2>
-
-          {/* Client */}
           <div className="space-y-4">
+
+            {/* Client */}
             <div>
               <label className="block text-sm font-medium text-foreground mb-1.5" htmlFor="client-select">
                 Cliente *
@@ -179,7 +190,7 @@ export default function NewAppointmentPage() {
               </select>
             </div>
 
-            {/* Date & time - Moved up so double booking triggers sensibly */}
+            {/* Date & time */}
             <div>
               <label className="block text-sm font-medium text-foreground mb-1.5" htmlFor="apt-datetime">
                 Fecha y hora *
@@ -194,7 +205,7 @@ export default function NewAppointmentPage() {
               />
             </div>
 
-            {/* Double booking alert */}
+            {/* Double booking alerts */}
             {doubleBookingLevel === 'warn' && (
               <div className="flex flex-col sm:flex-row items-start gap-3 p-4 rounded-2xl bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 animate-fade-in">
                 <AlertTriangle size={18} className="text-yellow-600 flex-shrink-0 mt-0.5" />
@@ -290,7 +301,6 @@ export default function NewAppointmentPage() {
           </div>
         </Card>
 
-        {/* Actions */}
         <div className="flex items-center justify-end gap-3 pb-10">
           <Link href="/dashboard/appointments">
             <Button variant="secondary" type="button">Cancelar</Button>

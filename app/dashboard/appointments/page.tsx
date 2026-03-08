@@ -1,100 +1,100 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { CalendarDays, Plus, ChevronLeft, ChevronRight, Search, Clock, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { AppointmentStatusBadge, DualBookingBadge } from '@/components/ui/badge'
 import { formatTime, formatCurrency } from '@/lib/utils'
-import { createClient } from '@/lib/supabase/server'
-import { getSession } from '@/lib/auth/get-session'
+import { createClient } from '@/lib/supabase/client'  // ✅ browser client
 import type { Appointment } from '@/types'
 import { format } from 'date-fns'
 
-// Mock Tenant ID for Data Guard isolation until Auth is fully integrated
-const TENANT_ID = '00000000-0000-0000-0000-000000000000'
-
 export default function AppointmentsPage() {
-  const [session, setSession] = useState<any>(null)
+  const [businessId, setBusinessId] = useState<string | null>(null)
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [loading, setLoading] = useState(true)
   const [view, setView] = useState<'day' | 'week'>('day')
   const [date, setDate] = useState(new Date())
   const [query, setQuery] = useState('')
+
+  // ✅ Client created once, stable reference
   const supabase = createClient()
 
+  // ✅ Step 1: get business_id from session
   useEffect(() => {
     async function init() {
-      const sess = await getSession()
-      setSession(sess)
-      
-      if (sess?.business_id) {
-        const today = format(new Date(), 'yyyy-MM-dd')
-        const { data } = await supabase
-          .from('appointments')
-          .select(`
-            *,
-            client:clients(id, name, phone, avatar_url),
-            service:services(id, name, color, duration_min, price),
-            assigned_user:users(id, name, avatar_url, color)
-          `)
-          .eq('business_id', sess.business_id)
-          .gte('start_at', today)
-          .order('start_at', { ascending: true })
-        
-        if (data) setAppointments(data as Appointment[])
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { data: dbUser } = await supabase
+        .from('users')
+        .select('business_id')
+        .eq('id', user.id)
+        .single()
+
+      if (dbUser?.business_id) {
+        setBusinessId(dbUser.business_id)
+      } else {
+        setLoading(false)
       }
-      setLoading(false)
     }
     init()
   }, [])
 
-  if (loading) {
-    return <div className="flex items-center justify-center min-h-[400px]">Cargando...</div>
+  // ✅ Step 2: fetch appointments when businessId or date changes
+  const fetchAppointments = useCallback(async () => {
+    if (!businessId) return
+    setLoading(true)
+
+    const startOfDay = format(date, 'yyyy-MM-dd')
+    const endOfDay = format(
+      new Date(date.getTime() + 24 * 60 * 60 * 1000 - 1),
+      'yyyy-MM-dd HH:mm:ss'
+    )
+
+    const { data, error } = await supabase
+      .from('appointments')
+      .select(`
+        id, start_at, end_at, status, is_dual_booking, notes,
+        client:clients(id, name, phone, avatar_url),
+        service:services(id, name, color, duration_min, price),
+        assigned_user:users(id, name, avatar_url, color)
+      `)
+      .eq('business_id', businessId)
+      .gte('start_at', startOfDay)
+      .lt('start_at', endOfDay)
+      .order('start_at', { ascending: true })
+
+    if (!error && data) {
+      setAppointments(data as Appointment[])
+    } else {
+      console.error('Error fetching appointments:', error)
+    }
+    setLoading(false)
+  }, [businessId, date]) // ✅ correct dependencies
+
+  useEffect(() => {
+    fetchAppointments()
+  }, [fetchAppointments])
+
+  if (loading && !businessId) {
+    return <div className="flex items-center justify-center min-h-[400px]"><Loader2 className="animate-spin" /></div>
   }
 
-  if (!session || !session.business_id) {
+  if (!businessId) {
     return <div>No autorizado. Por favor inicie sesión.</div>
   }
-  // Client-side fetching for date/view changes
-  useEffect(() => {
-    async function fetchAppointments() {
-      setLoading(true)
-      const startOfDay = format(date, 'yyyy-MM-dd')
-      const endOfDay = format(new Date(date.getTime() + 24 * 60 * 60 * 1000 - 1), 'yyyy-MM-dd HH:mm:ss') // End of day
-
-      const { data, error } = await supabase
-        .from('appointments')
-        .select(`
-          *,
-          client:clients(id, name, phone, avatar_url),
-          service:services(id, name, color, duration_min, price),
-          assigned_user:users(id, name, avatar_url, color)
-        `)
-        .eq('business_id', session.business_id)
-        .gte('start_at', startOfDay)
-        .lt('start_at', endOfDay) // Fetch appointments for the selected day
-        .order('start_at', { ascending: true })
-        
-      if (!error && data) {
-        setAppointments(data as Appointment[])
-      } else {
-        console.error('Error fetching appointments:', error)
-      }
-      setLoading(false)
-    }
-
-    fetchAppointments()
-  }, []) // Simplification: in real app, depend on date/view
 
   const filteredApts = appointments.filter(
-    (a) => a.client?.name.toLowerCase().includes(query.toLowerCase()) || 
-           a.service?.name.toLowerCase().includes(query.toLowerCase())
+    (a) =>
+      (a.client as any)?.name?.toLowerCase().includes(query.toLowerCase()) ||
+      (a.service as any)?.name?.toLowerCase().includes(query.toLowerCase())
   )
 
-  const handlePrevDay = () => setDate(d => new Date(d.setDate(d.getDate() - 1)))
-  const handleNextDay = () => setDate(d => new Date(d.setDate(d.getDate() + 1)))
+  const handlePrevDay = () => setDate(d => { const n = new Date(d); n.setDate(n.getDate() - 1); return n })
+  const handleNextDay = () => setDate(d => { const n = new Date(d); n.setDate(n.getDate() + 1); return n })
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -111,7 +111,6 @@ export default function AppointmentsPage() {
 
       {/* Toolbar */}
       <div className="flex flex-col sm:flex-row gap-4 items-center justify-between bg-surface p-2 rounded-2xl border border-border">
-        {/* Date navigation */}
         <div className="flex items-center gap-1 w-full sm:w-auto">
           <button onClick={handlePrevDay} className="btn-ghost p-2 rounded-xl">
             <ChevronLeft size={18} />
@@ -124,7 +123,6 @@ export default function AppointmentsPage() {
           </button>
         </div>
 
-        {/* View toggles & Search */}
         <div className="flex items-center gap-2 w-full sm:w-auto">
           <div className="relative flex-1 sm:w-64">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -180,38 +178,33 @@ export default function AppointmentsPage() {
                 key={apt.id}
                 className="flex items-start sm:items-center gap-4 p-4 hover:bg-surface transition-colors group"
               >
-                {/* Time */}
                 <div className="text-center w-14 flex-shrink-0 pt-1 sm:pt-0">
                   <p className="text-sm font-bold text-foreground">{formatTime(apt.start_at)}</p>
                   <p className="text-xs text-muted-foreground">{formatTime(apt.end_at)}</p>
                 </div>
-
-                {/* Color bar */}
                 <div
                   className="w-1 h-12 sm:h-10 rounded-full flex-shrink-0"
-                  style={{ backgroundColor: apt.service?.color || '#ccc' }}
+                  style={{ backgroundColor: (apt.service as any)?.color ?? '#ccc' }}
                 />
-
-                {/* Info */}
                 <div className="flex-1 min-w-0">
                   <div className="flex flex-wrap items-center gap-2 mb-0.5">
                     <p className="text-sm font-semibold text-foreground group-hover:text-brand-600 transition-colors">
-                      {apt.client?.name || 'Cliente desconocido'}
+                      {(apt.client as any)?.name ?? 'Cliente desconocido'}
                     </p>
                     {apt.is_dual_booking && <DualBookingBadge />}
                   </div>
                   <p className="text-xs text-muted-foreground flex items-center gap-2 flex-wrap">
-                    <span>{apt.service?.name} ({apt.service?.duration_min} min)</span>
+                    <span>{(apt.service as any)?.name} ({(apt.service as any)?.duration_min} min)</span>
                     <span className="hidden sm:inline text-border">•</span>
-                    <span className="flex items-center gap-1"><Clock size={11} /> {apt.assigned_user?.name || 'Sin asignar'}</span>
+                    <span className="flex items-center gap-1">
+                      <Clock size={11} /> {(apt.assigned_user as any)?.name ?? 'Sin asignar'}
+                    </span>
                   </p>
                 </div>
-
-                {/* Status & Price */}
                 <div className="flex flex-col items-end gap-2 flex-shrink-0">
-                  <AppointmentStatusBadge status={apt.status || 'pending'} />
+                  <AppointmentStatusBadge status={(apt.status ?? 'pending') as any} />
                   <p className="text-xs font-semibold text-foreground">
-                    {formatCurrency(apt.service?.price || 0)}
+                    {formatCurrency((apt.service as any)?.price ?? 0)}
                   </p>
                 </div>
               </div>

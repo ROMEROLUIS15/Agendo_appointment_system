@@ -1,10 +1,11 @@
-'use server'
+﻿'use server'
 
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 
 export async function register(formData: FormData) {
-  const supabase = createClient()
+  // Inicializamos el cliente con await para manejar las cookies correctamente
+  const supabase = await createClient()
 
   const firstName = formData.get('firstName') as string
   const lastName = formData.get('lastName') as string
@@ -12,7 +13,7 @@ export async function register(formData: FormData) {
   const email = formData.get('email') as string
   const password = formData.get('password') as string
 
-  // 1. Create user in Supabase Auth
+  // 1. Crear el usuario en el sistema de Autenticación de Supabase
   const { data: authData, error: authError } = await supabase.auth.signUp({
     email,
     password,
@@ -29,25 +30,29 @@ export async function register(formData: FormData) {
 
   const user = authData.user
   if (!user) {
-    return { error: 'No se pudo crear el usuario.' }
+    return { error: 'No se pudo crear el usuario en el sistema de autenticación.' }
   }
 
-  // 2. Create the business
+  // 2. Crear el negocio en la tabla 'businesses' (usando el ID del usuario)
   const { data: bizData, error: bizError } = await supabase
     .from('businesses')
     .insert({
       name: bizName,
       owner_id: user.id,
-      category: 'General', // Default category
+      category: 'General',
     })
     .select()
-    .single()
+    .maybeSingle()
 
   if (bizError) {
     return { error: 'Error al crear el negocio: ' + bizError.message }
   }
 
-  // 3. Create the user record in public.users
+  if (!bizData) {
+    return { error: 'No se pudo obtener la información del negocio creado.' }
+  }
+
+  // 3. Crear el perfil de usuario en nuestra tabla pública 'users'
   const { error: userError } = await supabase
     .from('users')
     .insert({
@@ -55,12 +60,13 @@ export async function register(formData: FormData) {
       name: `${firstName} ${lastName}`.trim(),
       email: email,
       business_id: bizData.id,
-      role: 'owner',
+      role: 'owner', // Verifica que 'owner' sea un valor permitido en tu base de datos
     })
 
   if (userError) {
     return { error: 'Error al crear el perfil de usuario: ' + userError.message }
   }
 
+  // Si todo sale bien, mandamos al usuario al panel de control
   redirect('/dashboard')
 }

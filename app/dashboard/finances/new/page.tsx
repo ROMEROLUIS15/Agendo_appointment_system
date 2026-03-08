@@ -1,29 +1,63 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { ArrowLeft, DollarSign } from 'lucide-react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { mockClients, mockServices } from '@/lib/mock/data'
+import { createClient } from '@/lib/supabase/client'
+import type { Database } from '@/types/database.types'
+
+type PaymentMethod = Database['public']['Enums']['payment_method']
 
 export default function NewFinancePage() {
+  const router = useRouter()
+  const supabase = createClient()
+  const [businessId, setBusinessId] = useState<string | null>(null)
+
   const [form, setForm] = useState({
-    amount:   '',
-    method:   'cash',
-    clientId: '',
-    serviceId:'',
-    notes:    '',
-    date:     '',
+    amount:    '',
+    method:    'cash' as PaymentMethod,
+    notes:     '',
+    date:      new Date().toISOString().split('T')[0],
   })
   const [saving, setSaving] = useState(false)
 
+  useEffect(() => {
+    async function init() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data: dbUser } = await supabase
+        .from('users').select('business_id').eq('id', user.id).single()
+      if (dbUser?.business_id) setBusinessId(dbUser.business_id)
+    }
+    init()
+  }, [])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!businessId) return alert('No se pudo obtener la sesión.')
     setSaving(true)
-    await new Promise((r) => setTimeout(r, 1000))
+
+    const amount = parseFloat(form.amount)
+
+    const { error } = await supabase.from('transactions').insert({
+      business_id: businessId,
+      amount,
+      net_amount:  amount, // sin descuento ni propina por defecto
+      method:      form.method,
+      notes:       form.notes.trim() || null,
+      paid_at: form.date ? new Date(form.date).toISOString() : null,
+    })
+
     setSaving(false)
-    alert('✅ Ingreso registrado correctamente')
+    if (error) {
+      alert('Error al registrar el ingreso: ' + error.message)
+    } else {
+      router.push('/dashboard/finances')
+      router.refresh()
+    }
   }
 
   return (
@@ -55,104 +89,53 @@ export default function NewFinancePage() {
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
                   <input
-                    id="amount"
-                    type="number"
-                    required
-                    min="0"
-                    step="0.01"
+                    id="amount" type="number" required min="0" step="0.01"
                     value={form.amount}
                     onChange={(e) => setForm({ ...form, amount: e.target.value })}
-                    className="input-base pl-8"
-                    placeholder="0.00"
+                    className="input-base pl-8" placeholder="0.00"
                   />
                 </div>
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1.5" htmlFor="method">
                   Método de pago *
                 </label>
-                <select
-                  id="method"
-                  required
-                  value={form.method}
-                  onChange={(e) => setForm({ ...form, method: e.target.value })}
+                <select id="method" required value={form.method}
+                  onChange={(e) => setForm({ ...form, method: e.target.value as PaymentMethod })}
                   className="input-base bg-card"
                 >
                   <option value="cash">Efectivo</option>
-                  <option value="card">Tarjeta de Crédito/Débito</option>
-                  <option value="transfer">Transferencia Bancaria</option>
+                  <option value="card">Tarjeta</option>
+                  <option value="transfer">Transferencia</option>
+                  <option value="qr">QR</option>
                   <option value="other">Otro</option>
                 </select>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5" htmlFor="date">
-                  Fecha del pago *
-                </label>
-                <input
-                  id="date"
-                  type="date"
-                  required
-                  value={form.date}
-                  onChange={(e) => setForm({ ...form, date: e.target.value })}
-                  className="input-base"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5" htmlFor="client">
-                  Cliente (opcional)
-                </label>
-                <select
-                  id="client"
-                  value={form.clientId}
-                  onChange={(e) => setForm({ ...form, clientId: e.target.value })}
-                  className="input-base bg-card"
-                >
-                  <option value="">Seleccionar cliente...</option>
-                  {mockClients.map(c => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5" htmlFor="service">
-                Concepto / Servicio (opcional)
+              <label className="block text-sm font-medium text-foreground mb-1.5" htmlFor="date">
+                Fecha del pago *
               </label>
-              <select
-                id="service"
-                value={form.serviceId}
-                onChange={(e) => setForm({ ...form, serviceId: e.target.value })}
-                className="input-base bg-card"
-              >
-                <option value="">Servicio general u otro concepto...</option>
-                {mockServices.map(s => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
-                ))}
-              </select>
+              <input id="date" type="date" required value={form.date}
+                onChange={(e) => setForm({ ...form, date: e.target.value })}
+                className="input-base"
+              />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-foreground mb-1.5" htmlFor="notes">
                 Nota aclaratoria (opcional)
               </label>
-              <textarea
-                id="notes"
-                rows={2}
-                value={form.notes}
+              <textarea id="notes" rows={2} value={form.notes}
                 onChange={(e) => setForm({ ...form, notes: e.target.value })}
                 className="input-base resize-none"
-                placeholder="Razón del pago extra, referencias..."
+                placeholder="Razón del pago, referencias..."
               />
             </div>
           </div>
         </Card>
 
-        {/* Actions */}
         <div className="flex items-center justify-end gap-3">
           <Link href="/dashboard/finances">
             <Button variant="secondary" type="button">Cancelar</Button>
