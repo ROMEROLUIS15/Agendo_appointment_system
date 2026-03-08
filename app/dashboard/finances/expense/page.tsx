@@ -11,13 +11,13 @@ import { formatCurrency, formatDate, expenseCategoryLabels } from '@/lib/utils'
 export default function ExpensesPage() {
   const [query, setQuery] = useState('')
 
-  // Corregido: Blindaje total contra valores null/undefined para que Vercel compile con éxito
+  // REESCRITURA TOTAL DEL FILTRO: Blindaje de nivel industrial para Vercel
   const filtered = mockExpenses.filter((e) => {
-    const q = query.toLowerCase()
-    const description = (e.description ?? '').toLowerCase()
-    const category = (e.category ?? '').toLowerCase()
+    const searchTerm = (query || '').toLowerCase();
+    const description = String(e?.description || '').toLowerCase();
+    const category = String(e?.category || '').toLowerCase();
     
-    return description.includes(q) || category.includes(q)
+    return description.includes(searchTerm) || category.includes(searchTerm);
   })
 
   return (
@@ -68,15 +68,14 @@ export default function ExpensesPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-foreground">
-                    {/* Verificación de seguridad para la etiqueta de categoría */}
                     {(expenseCategoryLabels as any)[exp.category] ?? exp.category ?? 'Gasto General'}
                   </p>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    {formatDate(exp.expense_date, 'd MMM yyyy')} · {exp.description ?? 'Sin descripción'}
+                    {formatDate(exp.expense_date, 'd MMM yyyy')} · {exp.description || 'Sin descripción'}
                   </p>
                 </div>
                 <div className="text-right flex-shrink-0">
-                  <p className="text-base font-bold text-red-600">-{formatCurrency(exp.amount ?? 0)}</p>
+                  <p className="text-base font-bold text-red-600">-{formatCurrency(exp.amount || 0)}</p>
                 </div>
               </div>
             ))}
