@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 
-export async function createBusiness(formData: FormData) {
+export async function createBusiness(prevState: any, formData: FormData) {
   const supabase = await createClient()
   
   const { data: { user }, error: authError } = await supabase.auth.getUser()
