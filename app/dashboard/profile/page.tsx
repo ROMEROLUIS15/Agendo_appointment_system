@@ -263,7 +263,7 @@ export default function ProfilePage() {
 
           {!changePassword && (
             <p className="text-xs text-muted-foreground mt-3 flex items-center gap-1.5">
-              <Lock size={12} /> Contraseña establecida — haz clic en "Cambiar contraseña" para modificarla
+              <Lock size={12} /> Contraseña establecida — haz clic en &quot;Cambiar contraseña&quot; para modificarla
             </p>
           )}
         </Card>
