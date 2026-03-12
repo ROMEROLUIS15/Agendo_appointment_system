@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { registerSchema } from '@/lib/validations/auth'
+import { headers } from 'next/headers'
 
 export async function register(formData: FormData) {
   const data = Object.fromEntries(formData.entries())
@@ -14,13 +15,20 @@ export async function register(formData: FormData) {
   const { firstName, lastName, bizName, email, password } = result.data
   const supabase = await createClient()
 
-  // 1. Crear usuario en Auth
-  // El trigger handle_new_user() crea el perfil en public.users automáticamente
+  // Determinar la URL base: priorizar variable de entorno de producción,
+  // luego el origin del request (útil en local).
+  const requestHeaders = await headers()
+  const origin = requestHeaders.get('origin') ?? ''
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? origin
+
+  // 1. Crear usuario en Auth con emailRedirectTo explícito para evitar
+  //    que el link del correo apunte a localhost en dispositivos móviles.
   const { data: authData, error: authError } = await supabase.auth.signUp({
     email,
     password,
     options: {
-      data: { full_name: `${firstName} ${lastName}`.trim() }
+      data: { full_name: `${firstName} ${lastName}`.trim() },
+      emailRedirectTo: `${siteUrl}/auth/callback`,
     }
   })
 

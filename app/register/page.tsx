@@ -91,9 +91,10 @@ export default function RegisterPage() {
 
         <div className="w-full relative z-10" style={{ maxWidth: "400px" }}>
           {/* ── MOBILE header ── */}
-          <div
+          <Link
+            href="/"
             className="flex flex-col items-center lg:hidden"
-            style={{ marginBottom: "2rem" }}
+            style={{ marginBottom: "2rem", textDecoration: "none" }}
           >
             <div
               className="h-16 w-16 rounded-2xl overflow-hidden"
@@ -136,7 +137,7 @@ export default function RegisterPage() {
             >
               Gestión Inteligente
             </p>
-          </div>
+          </Link>
 
           {success ? (
             /* ── Success state ── */
@@ -522,9 +523,10 @@ export default function RegisterPage() {
 
         <div className="relative z-10 flex flex-col h-full p-10 xl:p-12">
           {/* ── Logo row — big bottom margin ── */}
-          <div
+          <Link
+            href="/"
             className="flex items-center gap-3 flex-shrink-0"
-            style={{ marginBottom: "3rem" }}
+            style={{ marginBottom: "3rem", textDecoration: "none" }}
           >
             <div
               className="h-10 w-10 rounded-xl overflow-hidden flex-shrink-0"
@@ -554,7 +556,7 @@ export default function RegisterPage() {
                 unoptimized
               />
             </div>
-          </div>
+          </Link>
 
           {/* ── Badge ── */}
           <div
