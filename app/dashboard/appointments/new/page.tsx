@@ -87,6 +87,13 @@ export default function NewAppointmentPage() {
     if (doubleBookingLevel === 'warn' && !confirmed) return
     setSaving(true)
     const startObj = new Date(form.start_at)
+    
+    if (startObj < new Date()) {
+      setMsg({ type: 'error', text: 'No puedes asignar citas con fecha y hora en el pasado.' })
+      setSaving(false)
+      return
+    }
+
     const endObj = new Date(startObj.getTime() + (selectedService?.duration_min || 30) * 60000)
     const { error } = await supabase.from('appointments').insert({
       business_id:      businessId,

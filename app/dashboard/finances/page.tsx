@@ -1,18 +1,82 @@
-import type { Metadata } from 'next'
+"use client"
+
+import { useState, useEffect } from 'react'
 import {
   TrendingUp, TrendingDown, DollarSign, CreditCard,
-  Receipt, Plus, ArrowRight,
+  Receipt, Plus, ArrowRight, Loader2,
 } from 'lucide-react'
 import Link from 'next/link'
 import { StatCard, Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { mockTransactions, mockExpenses, mockFinanceSummary } from '@/lib/mock/data'
 import { formatCurrency, formatDate, paymentMethodLabels, expenseCategoryLabels } from '@/lib/utils'
-
-export const metadata: Metadata = { title: 'Finanzas' }
+import { createClient } from '@/lib/supabase/client'
 
 export default function FinancesPage() {
-  const summary = mockFinanceSummary
+  const supabase = createClient();
+  const [loading, setLoading] = useState(true);
+  const [summary, setSummary] = useState({ totalRevenue: 0, totalExpenses: 0, netProfit: 0 });
+  const [recentTransactions, setRecentTransactions] = useState<any[]>([]);
+  const [recentExpenses, setRecentExpenses] = useState<any[]>([]);
+
+  useEffect(() => {
+    async function loadData() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data: dbUser } = await supabase
+        .from("users")
+        .select("business_id")
+        .eq("id", user.id)
+        .single();
+        
+      if (!dbUser?.business_id) {
+        setLoading(false);
+        return;
+      }
+      
+      const bId = dbUser.business_id;
+      
+      // Fetch data for the current month
+      const date = new Date();
+      // start of current month exactly in local time formatted to YYYY-MM-DD
+      const startOfMonth = new Date(date.getFullYear(), date.getMonth(), 1).toISOString();
+      
+      const [txnRes, expRes] = await Promise.all([
+        supabase
+          .from("transactions")
+          .select("*")
+          .eq("business_id", bId)
+          .gte("paid_at", startOfMonth)
+          .order("paid_at", { ascending: false }),
+        supabase
+          .from("expenses")
+          .select("*")
+          .eq("business_id", bId)
+          .gte("expense_date", startOfMonth)
+          .order("expense_date", { ascending: false })
+      ]);
+      
+      const txns = txnRes.data || [];
+      const exps = expRes.data || [];
+      
+      const totalRevenue = txns.reduce((acc, t) => acc + (t.net_amount || 0), 0);
+      const totalExpenses = exps.reduce((acc, e) => acc + (e.amount || 0), 0);
+      const netProfit = totalRevenue - totalExpenses;
+      
+      setRecentTransactions(txns.slice(0, 5)); // Last 5
+      setRecentExpenses(exps.slice(0, 5));     // Last 5
+      setSummary({ totalRevenue, totalExpenses, netProfit });
+      setLoading(false);
+    }
+    loadData();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-brand-600" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -36,14 +100,12 @@ export default function FinancesPage() {
           title="Ingresos del mes"
           value={formatCurrency(summary.totalRevenue)}
           icon={<TrendingUp size={22} />}
-          trend={{ value: 12, label: 'vs mes anterior' }}
           accent
         />
         <StatCard
           title="Gastos del mes"
           value={formatCurrency(summary.totalExpenses)}
           icon={<TrendingDown size={22} />}
-          trend={{ value: -5, label: 'vs mes anterior' }}
         />
         <StatCard
           title="Ganancia neta"
@@ -84,20 +146,20 @@ export default function FinancesPage() {
               Ver todo <ArrowRight size={14} />
             </Link>
           </div>
-          {mockTransactions.length === 0 ? (
+          {recentTransactions.length === 0 ? (
             <div className="text-center py-8">
               <CreditCard size={36} className="text-muted-foreground mx-auto mb-2 opacity-40" />
-              <p className="text-sm text-muted-foreground">No hay cobros registrados</p>
+              <p className="text-sm text-muted-foreground">No hay cobros registrados este mes</p>
             </div>
           ) : (
             <div className="space-y-3">
-              {mockTransactions.map((txn) => (
+              {recentTransactions.map((txn) => (
                 <div key={txn.id} className="flex items-center gap-3 p-3 rounded-xl bg-surface">
                   <div className="h-9 w-9 rounded-xl bg-green-100 dark:bg-green-900/30 flex items-center justify-center flex-shrink-0">
                     <DollarSign size={16} className="text-green-600" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground">{paymentMethodLabels[txn.method]}</p>
+                    <p className="text-sm font-medium text-foreground">{paymentMethodLabels[txn.method] || 'Transferencia'}</p>
                     <p className="text-xs text-muted-foreground">
                       {txn.paid_at ? formatDate(txn.paid_at, 'd MMM, HH:mm') : '—'}
                     </p>
@@ -121,20 +183,20 @@ export default function FinancesPage() {
               Ver todo <ArrowRight size={14} />
             </Link>
           </div>
-          {mockExpenses.length === 0 ? (
+          {recentExpenses.length === 0 ? (
             <div className="text-center py-8">
               <Receipt size={36} className="text-muted-foreground mx-auto mb-2 opacity-40" />
-              <p className="text-sm text-muted-foreground">No hay gastos registrados</p>
+              <p className="text-sm text-muted-foreground">No hay gastos registrados este mes</p>
             </div>
           ) : (
             <div className="space-y-3">
-              {mockExpenses.map((exp) => (
+              {recentExpenses.map((exp) => (
                 <div key={exp.id} className="flex items-center gap-3 p-3 rounded-xl bg-surface">
                   <div className="h-9 w-9 rounded-xl bg-red-100 dark:bg-red-900/30 flex items-center justify-center flex-shrink-0">
                     <Receipt size={16} className="text-red-600" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground">{expenseCategoryLabels[exp.category]}</p>
+                    <p className="text-sm font-medium text-foreground">{(expenseCategoryLabels as any)[exp.category] || exp.category || 'Gasto'}</p>
                     <p className="text-xs text-muted-foreground truncate">{exp.description ?? '—'}</p>
                   </div>
                   <p className="text-sm font-semibold text-red-600">-{formatCurrency(exp.amount)}</p>

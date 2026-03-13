@@ -13,6 +13,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import type { Business, BusinessSettings } from "@/types";
+import { PhoneInputFlags, parsePhone, COUNTRIES, Country } from "@/components/ui/phone-input-flags";
 
 const CATEGORIES = [
   "Barbería",
@@ -26,6 +27,8 @@ const CATEGORIES = [
   "Estética / Belleza",
   "Salud / Medicina",
   "Deportes / Gimnasio",
+  "Tech",
+  "Electrodomésticos",
   "Otros",
 ];
 
@@ -70,9 +73,10 @@ export default function SettingsPage() {
   const [form, setForm] = useState({
     name: "",
     category: "",
-    phone: "",
+    phoneLocal: "",
     address: "",
   });
+  const [selectedCountry, setSelectedCountry] = useState<Country>(COUNTRIES[0] as Country);
   const [hours, setHours] =
     useState<Record<string, DayHours>>(buildDefaultHours);
 
@@ -99,10 +103,12 @@ export default function SettingsPage() {
         .single();
       if (business) {
         setBiz(business);
+        const { country, local } = parsePhone(business.phone);
+        setSelectedCountry(country);
         setForm({
           name: business.name,
           category: business.category ?? "",
-          phone: business.phone ?? "",
+          phoneLocal: local,
           address: business.address ?? "",
         });
         const wh = (business.settings as any)?.workingHours ?? {};
@@ -132,12 +138,18 @@ export default function SettingsPage() {
   const handleSaveBiz = async () => {
     if (!bizId) return;
     setSaving(true);
+    
+    // Combinar dial + número local
+    const fullPhone = form.phoneLocal.trim()
+      ? `${selectedCountry.dial} ${form.phoneLocal.trim()}`
+      : null;
+
     const { error } = await supabase
       .from("businesses")
       .update({
         name: form.name.trim(),
         category: form.category,
-        phone: form.phone.trim() || null,
+        phone: fullPhone,
         address: form.address.trim() || null,
       })
       .eq("id", bizId);
@@ -292,11 +304,11 @@ export default function SettingsPage() {
               >
                 Teléfono
               </label>
-              <input
-                value={form.phone}
-                onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                className="input-base"
-                placeholder="+58 412 000 0000"
+              <PhoneInputFlags
+                country={selectedCountry}
+                onCountryChange={(c) => setSelectedCountry(c)}
+                localPhone={form.phoneLocal}
+                onLocalPhoneChange={(v) => setForm({ ...form, phoneLocal: v })}
               />
             </div>
           </div>

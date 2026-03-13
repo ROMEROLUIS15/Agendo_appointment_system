@@ -342,10 +342,7 @@ export default function ServicesPage() {
                     className="absolute left-3 top-1/2 -translate-y-1/2"
                     style={{ color: "#909098" }}
                   />
-                  <input
-                    type="number"
-                    min={5}
-                    step={5}
+                  <select
                     value={form.duration_min}
                     onChange={(e) =>
                       setForm((f) => ({
@@ -354,7 +351,14 @@ export default function ServicesPage() {
                       }))
                     }
                     className="input-base pl-9"
-                  />
+                    style={{ backgroundColor: "#212125" }}
+                  >
+                    <option value={30}>30 minutos</option>
+                    <option value={60}>1 hora</option>
+                    <option value={90}>1:30 minutos</option>
+                    <option value={120}>2 horas</option>
+                    <option value={150}>2:30 minutos</option>
+                  </select>
                 </div>
               </div>
               <div>

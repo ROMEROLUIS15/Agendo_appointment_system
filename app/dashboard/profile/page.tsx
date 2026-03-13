@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { createClient } from '@/lib/supabase/client'
 import { updateProfile } from './actions'
 import { PasswordInput } from '@/components/ui/password-input'
+import { PhoneInputFlags, parsePhone, type Country, COUNTRIES } from '@/components/ui/phone-input-flags'
 
 export default function ProfilePage() {
   const [user, setUser] = useState<any>(null)
@@ -18,6 +19,10 @@ export default function ProfilePage() {
   const [success, setSuccess] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const [changePassword, setChangePassword] = useState(false)
+  
+  const [phoneCountry, setPhoneCountry] = useState<Country>(COUNTRIES[1])
+  const [localPhone, setLocalPhone] = useState('')
+
   const fileInputRef = useRef<HTMLInputElement>(null)
   const supabase = createClient()
 
@@ -29,6 +34,10 @@ export default function ProfilePage() {
           .from('users').select('*').eq('id', authUser.id).single()
         setUser({ ...authUser, ...dbUser })
         setAvatarUrl(dbUser?.avatar_url ?? null)
+
+        const parsed = parsePhone(dbUser?.phone)
+        setPhoneCountry(parsed.country || COUNTRIES[1])
+        setLocalPhone(parsed.local)
       }
       setLoading(false)
     }
@@ -201,9 +210,13 @@ export default function ProfilePage() {
                   Teléfono
                 </label>
                 <div className="relative">
-                  <Phone size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                  <input name="phone" defaultValue={user?.phone} className="input-base pl-10"
-                    placeholder="+57 300 000 0000" />
+                  <input type="hidden" name="phone" value={`${phoneCountry.dial} ${localPhone.trim()}`} />
+                  <PhoneInputFlags
+                    country={phoneCountry}
+                    onCountryChange={setPhoneCountry}
+                    localPhone={localPhone}
+                    onLocalPhoneChange={setLocalPhone}
+                  />
                 </div>
               </div>
             </div>

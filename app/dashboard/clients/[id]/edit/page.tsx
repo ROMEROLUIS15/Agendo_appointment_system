@@ -1,36 +1,43 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, User, Phone, Mail, Calendar, Tag, FileText, Save, AlertCircle, CheckCircle2, Trash2 } from 'lucide-react'
+import {
+  ArrowLeft, UserPen, ChevronDown, Mail, Calendar,
+  Tag, FileText, Save, AlertCircle, CheckCircle2, Trash2,
+} from 'lucide-react'
 import Link from 'next/link'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { createClient } from '@/lib/supabase/client'
+import { PhoneInputFlags, parsePhone, COUNTRIES, Country } from '@/components/ui/phone-input-flags'
 
+const TAG_OPTIONS = ['VIP', 'Frecuente', 'Nuevo']
+// ── Props ─────────────────────────────────────────────────────────────────────
 interface Props { params: { id: string } }
 
-const TAGS = ['VIP', 'Frecuente', 'Nuevo']
-
+// ── Component ─────────────────────────────────────────────────────────────────
 export default function ClientEditPage({ params }: Props) {
-  const router = useRouter()
+  const router   = useRouter()
   const supabase = createClient()
 
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [deleting, setDeleting] = useState(false)
-  const [confirmDelete, setConfirmDelete] = useState(false)
-  const [businessId, setBusinessId] = useState<string | null>(null)
-  const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [loading,        setLoading]        = useState(true)
+  const [saving,         setSaving]         = useState(false)
+  const [deleting,       setDeleting]       = useState(false)
+  const [confirmDelete,  setConfirmDelete]  = useState(false)
+  const [businessId,     setBusinessId]     = useState<string | null>(null)
+  const [msg,            setMsg]            = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   const [form, setForm] = useState({
-    name: '',
-    phone: '',
-    email: '',
-    birthday: '',
-    notes: '',
-    tags: [] as string[],
+    name:       '',
+    phoneLocal: '',
+    email:      '',
+    birthday:   '',
+    notes:      '',
+    tags:       [] as string[],
   })
+
+  const [selectedCountry, setSelectedCountry] = useState<Country>(COUNTRIES[0] as Country)
 
   useEffect(() => {
     async function load() {
@@ -52,13 +59,17 @@ export default function ClientEditPage({ params }: Props) {
 
       if (error || !client) return router.push('/dashboard/clients')
 
+      // Parsear teléfono guardado
+      const { country, local } = parsePhone(client.phone ?? '')
+
+      setSelectedCountry(country)
       setForm({
-        name:     client.name ?? '',
-        phone:    client.phone ?? '',
-        email:    client.email ?? '',
-        birthday: client.birthday ?? '',
-        notes:    client.notes ?? '',
-        tags:     client.tags ?? [],
+        name:       client.name      ?? '',
+        phoneLocal: local,
+        email:      client.email     ?? '',
+        birthday:   client.birthday  ?? '',
+        notes:      client.notes     ?? '',
+        tags:       client.tags      ?? [],
       })
       setLoading(false)
     }
@@ -83,15 +94,19 @@ export default function ClientEditPage({ params }: Props) {
     if (!businessId) return
     setSaving(true)
 
+    const fullPhone = form.phoneLocal.trim()
+      ? `${selectedCountry.dial} ${form.phoneLocal.trim()}`
+      : null
+
     const { error } = await supabase
       .from('clients')
       .update({
-        name:     form.name.trim(),
-        phone:    form.phone.trim() || null,
-        email:    form.email.trim() || null,
-        birthday: form.birthday || null,
-        notes:    form.notes.trim() || null,
-        tags:     form.tags.length > 0 ? form.tags : null,
+        name:       form.name.trim(),
+        phone:      fullPhone,
+        email:      form.email.trim()    || null,
+        birthday:   form.birthday        || null,
+        notes:      form.notes.trim()    || null,
+        tags:       form.tags.length > 0 ? form.tags : null,
         updated_at: new Date().toISOString(),
       })
       .eq('id', params.id)
@@ -106,8 +121,6 @@ export default function ClientEditPage({ params }: Props) {
   const handleDelete = async () => {
     if (!businessId) return
     setDeleting(true)
-
-    // Soft delete
     const { error } = await supabase
       .from('clients')
       .update({ deleted_at: new Date().toISOString() })
@@ -122,165 +135,210 @@ export default function ClientEditPage({ params }: Props) {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin h-8 w-8 border-4 border-brand-600 border-t-transparent rounded-full" />
+        <div className="animate-spin h-8 w-8 rounded-full"
+          style={{ border: '3px solid #272729', borderTopColor: '#0062FF' }} />
       </div>
     )
   }
 
   return (
     <div className="space-y-6 animate-fade-in max-w-2xl">
-      <div className="flex items-center justify-between">
-        <Link href={`/dashboard/clients/${params.id}`}
-          className="btn-ghost inline-flex text-sm gap-2 text-muted-foreground hover:text-foreground">
-          <ArrowLeft size={16} /> Volver al perfil
-        </Link>
-      </div>
+      {/* Back */}
+      <Link
+        href={`/dashboard/clients/${params.id}`}
+        className="btn-ghost inline-flex text-sm gap-2"
+        style={{ color: '#909098' }}
+      >
+        <ArrowLeft size={16} /> Volver al perfil
+      </Link>
 
+      {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-foreground">Editar Cliente</h1>
-        <p className="text-muted-foreground text-sm">Actualiza la información del cliente</p>
+        <h1 className="text-2xl font-black" style={{ color: '#F2F2F2', letterSpacing: '-0.025em' }}>
+          Editar Cliente
+        </h1>
+        <p className="text-sm" style={{ color: '#909098' }}>Actualiza la información del cliente</p>
       </div>
 
+      {/* Feedback */}
       {msg && (
-        <div className={`p-4 rounded-xl flex items-center gap-3 text-sm border ${
-          msg.type === 'success'
-            ? 'bg-green-50 text-green-700 border-green-100'
-            : 'bg-red-50 text-red-600 border-red-100'
-        }`}>
-          {msg.type === 'success' ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
+        <div
+          className="p-4 rounded-xl flex items-center gap-3 text-sm"
+          style={msg.type === 'success'
+            ? { background: 'rgba(48,209,88,0.08)',  border: '1px solid rgba(48,209,88,0.2)',  color: '#30D158' }
+            : { background: 'rgba(255,59,48,0.08)',  border: '1px solid rgba(255,59,48,0.2)',  color: '#FF3B30' }
+          }
+        >
+          {msg.type === 'success'
+            ? <CheckCircle2 size={18} />
+            : <AlertCircle  size={18} />
+          }
           {msg.text}
         </div>
       )}
 
+      {/* ── Información personal ─────────────────────────────────────────── */}
       <Card>
-        <h2 className="text-base font-semibold text-foreground mb-4">Información personal</h2>
+        <div className="flex items-center gap-3 mb-5">
+          <div className="h-9 w-9 rounded-xl flex items-center justify-center flex-shrink-0"
+            style={{ background: 'rgba(0,98,255,0.1)' }}>
+            <UserPen size={18} style={{ color: '#0062FF' }} />
+          </div>
+          <h2 className="text-base font-semibold" style={{ color: '#F2F2F2' }}>
+            Información personal
+          </h2>
+        </div>
+
         <div className="space-y-4">
+          {/* Nombre */}
           <div>
-            <label className="block text-sm font-medium text-foreground mb-1.5">
-              Nombre completo <span className="text-red-500">*</span>
+            <label className="block text-sm font-medium mb-1.5" style={{ color: '#F2F2F2' }}>
+              Nombre completo <span style={{ color: '#FF3B30' }}>*</span>
             </label>
-            <div className="relative">
-              <User size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <input
-                value={form.name}
-                onChange={e => setForm({ ...form, name: e.target.value })}
-                className="input-base pl-10"
-                placeholder="Nombre del cliente"
-              />
-            </div>
+            <input
+              value={form.name}
+              onChange={e => setForm({ ...form, name: e.target.value })}
+              className="input-base"
+              placeholder="Nombre del cliente"
+            />
           </div>
 
+          {/* Teléfono con selector de país */}
+          <div>
+            <label className="block text-sm font-medium mb-1.5" style={{ color: '#F2F2F2' }}>
+              Teléfono
+            </label>
+            <PhoneInputFlags
+              country={selectedCountry}
+              onCountryChange={c => setSelectedCountry(c)}
+              localPhone={form.phoneLocal}
+              onLocalPhoneChange={v => setForm({ ...form, phoneLocal: v })}
+            />
+          </div>
+
+          {/* Email + Cumpleaños */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">Teléfono</label>
+              <label className="block text-sm font-medium mb-1.5" style={{ color: '#F2F2F2' }}>
+                Email
+              </label>
               <div className="relative">
-                <Phone size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <Mail size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: '#606068' }} />
                 <input
-                  value={form.phone}
-                  onChange={e => setForm({ ...form, phone: e.target.value })}
-                  className="input-base pl-10"
-                  placeholder="+57 300 000 0000"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">Correo electrónico</label>
-              <div className="relative">
-                <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                <input
+                  type="email"
                   value={form.email}
                   onChange={e => setForm({ ...form, email: e.target.value })}
-                  className="input-base pl-10"
+                  className="input-base pl-9"
                   placeholder="correo@ejemplo.com"
                 />
               </div>
             </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-foreground mb-1.5">Fecha de nacimiento</label>
-            <div className="relative">
-              <Calendar size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <input
-                type="date"
-                value={form.birthday}
-                onChange={e => setForm({ ...form, birthday: e.target.value })}
-                className="input-base pl-10"
-              />
+            <div>
+              <label className="block text-sm font-medium mb-1.5" style={{ color: '#F2F2F2' }}>
+                Fecha de nacimiento
+              </label>
+              <div className="relative">
+                <Calendar size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: '#606068' }} />
+                <input
+                  type="date"
+                  value={form.birthday}
+                  onChange={e => setForm({ ...form, birthday: e.target.value })}
+                  className="input-base pl-9"
+                />
+              </div>
             </div>
           </div>
         </div>
       </Card>
 
+      {/* ── Etiquetas ────────────────────────────────────────────────────── */}
       <Card>
-        <div className="flex items-center gap-2 mb-3">
-          <Tag size={16} className="text-brand-600" />
-          <h2 className="text-base font-semibold text-foreground">Etiquetas</h2>
+        <div className="flex items-center gap-3 mb-4">
+          <div className="h-9 w-9 rounded-xl flex items-center justify-center flex-shrink-0"
+            style={{ background: 'rgba(0,98,255,0.1)' }}>
+            <Tag size={18} style={{ color: '#0062FF' }} />
+          </div>
+          <h2 className="text-base font-semibold" style={{ color: '#F2F2F2' }}>Etiquetas</h2>
         </div>
         <div className="flex gap-2 flex-wrap">
-          {TAGS.map(tag => (
+          {TAG_OPTIONS.map(tag => (
             <button
               key={tag}
               type="button"
               onClick={() => toggleTag(tag)}
-              className={`px-4 py-2 rounded-xl text-sm font-semibold border-2 transition-all ${
-                form.tags.includes(tag)
-                  ? 'bg-brand-600 text-white border-brand-600 shadow-sm'
-                  : 'bg-surface text-muted-foreground border-border hover:border-brand-300'
-              }`}
+              className="px-4 py-1.5 rounded-full text-sm font-semibold transition-all"
+              style={form.tags.includes(tag)
+                ? { background: '#0062FF', color: '#fff',    border: '1px solid #0062FF' }
+                : { background: 'transparent', color: '#909098', border: '1px solid #2E2E33' }
+              }
             >
               {tag}
             </button>
           ))}
         </div>
+        {form.tags.length > 0 && (
+          <p className="text-xs mt-2" style={{ color: '#6A6A72' }}>
+            Seleccionadas: {form.tags.join(', ')}
+          </p>
+        )}
       </Card>
 
+      {/* ── Notas ────────────────────────────────────────────────────────── */}
       <Card>
-        <div className="flex items-center gap-2 mb-3">
-          <FileText size={16} className="text-brand-600" />
-          <h2 className="text-base font-semibold text-foreground">Notas internas</h2>
+        <div className="flex items-center gap-3 mb-4">
+          <div className="h-9 w-9 rounded-xl flex items-center justify-center flex-shrink-0"
+            style={{ background: 'rgba(0,98,255,0.1)' }}>
+            <FileText size={18} style={{ color: '#0062FF' }} />
+          </div>
+          <h2 className="text-base font-semibold" style={{ color: '#F2F2F2' }}>Notas internas</h2>
         </div>
         <textarea
           value={form.notes}
           onChange={e => setForm({ ...form, notes: e.target.value })}
-          className="input-base min-h-[100px] resize-none"
+          className="input-base resize-none"
           placeholder="Preferencias, alergias, observaciones..."
           rows={4}
         />
       </Card>
 
-      <div className="flex items-center justify-between pt-2">
-        {/* Delete */}
+      {/* ── Acciones ─────────────────────────────────────────────────────── */}
+      <div className="flex items-center justify-between pt-2 pb-10">
+        {/* Eliminar */}
         {!confirmDelete ? (
           <button
             type="button"
             onClick={() => setConfirmDelete(true)}
-            className="flex items-center gap-2 text-sm text-red-500 hover:text-red-600 hover:underline"
+            className="flex items-center gap-2 text-sm transition-colors"
+            style={{ color: '#FF3B30' }}
           >
             <Trash2 size={14} /> Eliminar cliente
           </button>
         ) : (
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-red-600 font-medium">¿Confirmar eliminación?</span>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-sm font-medium" style={{ color: '#FF3B30' }}>
+              ¿Confirmar eliminación?
+            </span>
             <button
               type="button"
               onClick={handleDelete}
               disabled={deleting}
-              className="px-3 py-1.5 text-xs font-bold text-white bg-red-500 hover:bg-red-600 rounded-lg disabled:opacity-50"
+              className="px-3 py-1.5 text-xs font-bold text-white rounded-lg disabled:opacity-50"
+              style={{ background: '#FF3B30' }}
             >
               {deleting ? 'Eliminando...' : 'Sí, eliminar'}
             </button>
             <button
               type="button"
               onClick={() => setConfirmDelete(false)}
-              className="px-3 py-1.5 text-xs font-medium border border-border rounded-lg hover:bg-surface"
+              className="px-3 py-1.5 text-xs font-medium rounded-lg"
+              style={{ border: '1px solid #2E2E33', color: '#909098' }}
             >
               Cancelar
             </button>
           </div>
         )}
 
-        {/* Save */}
+        {/* Guardar */}
         <Button onClick={handleSave} loading={saving} leftIcon={<Save size={16} />}>
           Guardar cambios
         </Button>

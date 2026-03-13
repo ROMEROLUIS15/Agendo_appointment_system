@@ -1,20 +1,60 @@
 'use client'
 
-import { useState } from 'react'
-import { ArrowLeft, DollarSign, Search, Plus } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { ArrowLeft, DollarSign, Search, Plus, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { mockTransactions } from '@/lib/mock/data'
 import { formatCurrency, formatDate, paymentMethodLabels } from '@/lib/utils'
+import { createClient } from '@/lib/supabase/client'
 
 export default function TransactionsPage() {
+  const supabase = createClient()
   const [query, setQuery] = useState('')
+  const [transactions, setTransactions] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
 
-  const filtered = mockTransactions.filter((t) =>
+  useEffect(() => {
+    async function loadTransactions() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      
+      const { data: dbUser } = await supabase
+        .from('users')
+        .select('business_id')
+        .eq('id', user.id)
+        .single()
+        
+      if (!dbUser?.business_id) {
+        setLoading(false)
+        return
+      }
+      
+      const { data } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('business_id', dbUser.business_id)
+        .order('paid_at', { ascending: false })
+        
+      setTransactions(data || [])
+      setLoading(false)
+    }
+    
+    loadTransactions()
+  }, [])
+
+  const filtered = transactions.filter((t) =>
     (t.notes ?? '').toLowerCase().includes(query.toLowerCase()) ||
-    t.method.toLowerCase().includes(query.toLowerCase())
+    String(t.method || '').toLowerCase().includes(query.toLowerCase())
   )
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center min-h-[400px]">
+        <Loader2 className="w-8 h-8 animate-spin text-brand-600" />
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -25,7 +65,7 @@ export default function TransactionsPage() {
           </Link>
           <div>
             <h1 className="text-2xl font-bold text-foreground">Historial de Cobros</h1>
-            <p className="text-muted-foreground text-sm">{mockTransactions.length} ingresos registrados</p>
+            <p className="text-muted-foreground text-sm">{transactions.length} ingresos registrados</p>
           </div>
         </div>
         <Link href="/dashboard/finances/new">
@@ -57,7 +97,7 @@ export default function TransactionsPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-foreground">
-                    {paymentMethodLabels[txn.method]}
+                    {paymentMethodLabels[txn.method] || 'Transferencia'}
                   </p>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {txn.paid_at ? formatDate(txn.paid_at, 'd MMM yyyy, HH:mm') : '—'}

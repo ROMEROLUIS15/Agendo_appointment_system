@@ -19,6 +19,8 @@ const CATEGORIES = [
   "Consultoría",
   "Salud / Medicina",
   "Deportes / Gimnasio",
+  "Tech",
+  "Electrodomésticos",
   "Otros",
 ];
 

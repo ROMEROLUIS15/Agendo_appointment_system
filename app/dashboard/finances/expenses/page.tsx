@@ -1,24 +1,64 @@
 'use client'
 
-import { useState } from 'react'
-import { ArrowLeft, Receipt, Search, Plus } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { ArrowLeft, Receipt, Search, Plus, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { mockExpenses } from '@/lib/mock/data'
 import { formatCurrency, formatDate, expenseCategoryLabels } from '@/lib/utils'
+import { createClient } from '@/lib/supabase/client'
 
 export default function ExpensesPage() {
+  const supabase = createClient()
   const [query, setQuery] = useState('')
+  const [expenses, setExpenses] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function loadExpenses() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      
+      const { data: dbUser } = await supabase
+        .from('users')
+        .select('business_id')
+        .eq('id', user.id)
+        .single()
+        
+      if (!dbUser?.business_id) {
+        setLoading(false)
+        return
+      }
+      
+      const { data } = await supabase
+        .from('expenses')
+        .select('*')
+        .eq('business_id', dbUser.business_id)
+        .order('expense_date', { ascending: false })
+        
+      setExpenses(data || [])
+      setLoading(false)
+    }
+    
+    loadExpenses()
+  }, [])
 
   // REESCRITURA TOTAL DEL FILTRO: Blindaje de nivel industrial para Vercel
-  const filtered = mockExpenses.filter((e) => {
-    const searchTerm = (query || '').toLowerCase();
-    const description = String(e?.description || '').toLowerCase();
-    const category = String(e?.category || '').toLowerCase();
+  const filtered = expenses.filter((e) => {
+    const searchTerm = (query || '').toLowerCase()
+    const description = String(e?.description || '').toLowerCase()
+    const category = String(e?.category || '').toLowerCase()
     
-    return description.includes(searchTerm) || category.includes(searchTerm);
+    return description.includes(searchTerm) || category.includes(searchTerm)
   })
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center min-h-[400px]">
+        <Loader2 className="w-8 h-8 animate-spin text-brand-600" />
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -29,7 +69,7 @@ export default function ExpensesPage() {
           </Link>
           <div>
             <h1 className="text-2xl font-bold text-foreground">Historial de Gastos</h1>
-            <p className="text-muted-foreground text-sm">{mockExpenses.length} egresos registrados</p>
+            <p className="text-muted-foreground text-sm">{expenses.length} egresos registrados</p>
           </div>
         </div>
         <Link href="/dashboard/finances/expense">

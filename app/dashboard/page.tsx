@@ -23,11 +23,12 @@ import {
   AlertCircle,
 } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
 import { formatCurrency, formatTime } from "@/lib/utils";
 import { ServicesOnboardingBanner } from "@/components/dashboard/services-onboarding-banner";
 import { AppointmentStatusBadge } from "@/components/ui/badge";
-import { StatCard } from "@/components/ui/card";
+import { StatCard, Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
   format,
@@ -291,25 +292,70 @@ export default function DashboardPage() {
   // ── No business ───────────────────────────────────────────────
   if (!loading && !businessId) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="text-center max-w-md p-8 card-base">
-          <div
-            className="h-16 w-16 rounded-2xl flex items-center justify-center mx-auto mb-4"
-            style={{ background: "rgba(0,98,255,0.1)", color: "#0062FF" }}
-          >
-            <Users size={32} />
+      <div className="flex items-center justify-center min-h-[80vh] p-4 text-center">
+        <div className="w-full max-w-lg mb-12">
+          <div className="flex flex-col items-center mb-10 gap-3">
+            <div
+              className="h-20 w-20 rounded-3xl overflow-hidden flex-shrink-0 animate-slide-up"
+              style={{
+                border: "1px solid rgba(0,98,255,0.25)",
+                boxShadow:
+                  "0 0 40px rgba(0,98,255,0.3), 0 0 80px rgba(0,98,255,0.1)",
+              }}
+            >
+              <Image
+                src="/cronix-logo.jpg"
+                alt="Cronix"
+                width={80}
+                height={80}
+                className="h-full w-full object-cover"
+                unoptimized
+              />
+            </div>
+            <div
+              className="relative h-9 w-36 animate-slide-up"
+              style={{ animationDelay: "0.1s" }}
+            >
+              <Image
+                src="/cronix-letras.jpg"
+                alt="Cronix"
+                fill
+                className="object-contain"
+                unoptimized
+              />
+            </div>
           </div>
-          <h2 className="text-xl font-bold mb-2" style={{ color: "#F5F5F5" }}>
-            ¡Bienvenido a Cronix!
-          </h2>
-          <p className="mb-6" style={{ color: "#8A8A90" }}>
-            Configura tu negocio para comenzar.
-          </p>
-          <Link href="/dashboard/setup">
-            <Button className="w-full btn-primary">
-              Configurar mi negocio
-            </Button>
-          </Link>
+
+          <Card
+            className="p-8 sm:p-10 rounded-[2rem] sm:rounded-[2.5rem] animate-slide-up"
+            style={{
+              borderTop: "4px solid #0062FF",
+              background: "rgba(26,26,31,0.95)",
+              animationDelay: "0.2s",
+            }}
+          >
+            <h2
+              className="text-2xl sm:text-3xl font-black mb-3 text-center"
+              style={{ color: "#F2F2F2", letterSpacing: "-0.03em" }}
+            >
+              ¡Bienvenido a Cronix!
+            </h2>
+            <p
+              className="mb-8 text-center text-sm sm:text-base"
+              style={{ color: "#909098" }}
+            >
+              Sencillez y elegancia para gestionar tu negocio.
+            </p>
+            <Link href="/dashboard/setup">
+              <Button className="w-full py-4 sm:py-6 text-base sm:text-lg group btn-primary">
+                Configurar mi negocio
+                <ArrowRight
+                  size={20}
+                  className="ml-2 group-hover:translate-x-1 transition-transform"
+                />
+              </Button>
+            </Link>
+          </Card>
         </div>
       </div>
     );
@@ -323,7 +369,7 @@ export default function DashboardPage() {
         ${dayPanelOpen || panelOpen ? "lg:mr-80 xl:mr-96" : ""}`}
       >
         {/* Header */}
-        <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
             <h1
               className="text-xl sm:text-2xl font-black"
@@ -338,43 +384,67 @@ export default function DashboardPage() {
               {format(today, "EEEE d 'de' MMMM yyyy", { locale: es })}
             </p>
           </div>
+
           <div className="flex flex-wrap items-center gap-3">
             {/* Tabs */}
-            <div
-              className="flex items-center gap-1 p-1 rounded-xl w-fit"
-              style={{ background: "#1E1E21" }}
-            >
+            <div className="flex items-center gap-2 w-full sm:w-fit">
               {(["agenda", "resumen"] as const).map((t) => (
                 <button
                   key={t}
                   onClick={() => setTab(t)}
-                  className="px-3 sm:px-4 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all duration-200 flex items-center gap-1.5 sm:gap-2"
+                  className="flex-1 sm:flex-none px-3 sm:px-4 py-2 text-sm font-semibold rounded-xl transition-all duration-200 flex items-center justify-center gap-2"
                   style={
                     tab === t
-                      ? { background: "#0062FF", color: "#fff" }
-                      : { color: "#8A8A90" }
+                      ? {
+                          background: "#0062FF",
+                          color: "#fff",
+                          border: "1px solid #0062FF",
+                        }
+                      : {
+                          background: "rgba(0,98,255,0.1)",
+                          color: "#3884FF",
+                          border: "1px solid rgba(0,98,255,0.2)",
+                        }
                   }
                 >
                   {t === "agenda" ? (
                     <>
-                      <CalendarDays size={15} /> <span className="hidden xs:inline">Agenda</span>
+                      <CalendarDays size={16} /> <span>Agenda</span>
                     </>
                   ) : (
                     <>
-                      <BarChart3 size={15} /> <span className="hidden xs:inline">Resumen</span>
+                      <BarChart3 size={16} /> <span>Resumen</span>
                     </>
                   )}
                 </button>
               ))}
             </div>
 
-            <Link href="/dashboard/appointments/new">
-              <button className="btn-primary flex items-center gap-2 text-sm px-4 py-2 sm:px-5 sm:py-2.5">
-                <Plus size={15} />{" "}
-                <span className="hidden sm:inline">Nueva Cita</span>
-                <span className="sm:hidden">Nueva</span>
-              </button>
-            </Link>
+            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto mt-2 sm:mt-0">
+              <Link
+                href="/dashboard/clients/new"
+                className="flex-1 sm:flex-none"
+              >
+                <button
+                  className="w-full flex items-center justify-center gap-2 text-sm px-4 py-2.5 rounded-xl font-semibold transition-all duration-200 hover:opacity-90 active:scale-95"
+                  style={{
+                    background: "rgba(0,98,255,0.1)",
+                    color: "#3884FF",
+                    border: "1px solid rgba(0,98,255,0.2)",
+                  }}
+                >
+                  <User size={16} /> <span>Nuevo Cliente</span>
+                </button>
+              </Link>
+              <Link
+                href="/dashboard/appointments/new"
+                className="flex-1 sm:flex-none"
+              >
+                <button className="w-full btn-primary flex items-center justify-center gap-2 text-sm px-4 py-2.5">
+                  <Plus size={16} /> <span>Nueva Cita</span>
+                </button>
+              </Link>
+            </div>
           </div>
         </div>
 
@@ -433,10 +503,11 @@ export default function DashboardPage() {
 
             {/* Legend */}
             <div
-              className="flex flex-wrap items-center gap-3 sm:gap-5 px-4 py-2.5 rounded-xl"
+              className="flex flex-wrap items-center gap-4 sm:gap-6 px-5 py-3.5 rounded-2xl"
               style={{
-                background: "rgba(255,255,255,0.025)",
-                border: "1px solid rgba(255,255,255,0.05)",
+                background: "linear-gradient(180deg, #22222E 0%, #1C1C28 100%)",
+                border: "1px solid #2A2A38",
+                boxShadow: "0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)",
               }}
             >
               {[
