@@ -68,14 +68,11 @@ export default function LoginPage() {
   };
 
   return (
-    /* Root: stacks vertically on mobile, row on lg+ */
     <div
       className="min-h-screen flex flex-col lg:flex-row"
       style={{ backgroundColor: "#060608" }}
     >
-      {/* ═══════════════════════════════════════
-          BRAND PANEL — hidden on mobile, 46% on desktop
-      ═══════════════════════════════════════ */}
+      {/* ── BRAND PANEL ── */}
       <div
         className="hidden lg:flex lg:w-[46%] xl:w-[44%] flex-col relative overflow-hidden"
         style={{
@@ -83,7 +80,6 @@ export default function LoginPage() {
             "linear-gradient(160deg, #0A0E1A 0%, #0D1B3E 35%, #0A2472 65%, #1140A0 100%)",
         }}
       >
-        {/* decorative orbs */}
         <div
           style={{
             position: "absolute",
@@ -92,10 +88,10 @@ export default function LoginPage() {
             width: "420px",
             height: "420px",
             borderRadius: "50%",
-            background:
-              "radial-gradient(circle, rgba(56,132,255,0.22) 0%, rgba(56,132,255,0.04) 50%, transparent 70%)",
             filter: "blur(10px)",
             pointerEvents: "none",
+            background:
+              "radial-gradient(circle, rgba(56,132,255,0.22) 0%, rgba(56,132,255,0.04) 50%, transparent 70%)",
           }}
         />
         <div
@@ -106,26 +102,24 @@ export default function LoginPage() {
             width: "360px",
             height: "360px",
             borderRadius: "50%",
-            background:
-              "radial-gradient(circle, rgba(99,179,255,0.12) 0%, transparent 65%)",
             filter: "blur(22px)",
             pointerEvents: "none",
+            background:
+              "radial-gradient(circle, rgba(99,179,255,0.12) 0%, transparent 65%)",
           }}
         />
-        {/* subtle grid */}
         <div
           style={{
             position: "absolute",
             inset: 0,
+            pointerEvents: "none",
             backgroundImage:
               "linear-gradient(rgba(255,255,255,0.022) 1px, transparent 1px),linear-gradient(90deg, rgba(255,255,255,0.022) 1px, transparent 1px)",
             backgroundSize: "48px 48px",
-            pointerEvents: "none",
           }}
         />
 
         <div className="relative z-10 flex flex-col h-full p-10 xl:p-12">
-          {/* ── Logo row ── */}
           <Link
             href="/"
             className="flex items-center gap-3 flex-shrink-0"
@@ -161,7 +155,6 @@ export default function LoginPage() {
             </div>
           </Link>
 
-          {/* ── Badge ── */}
           <div
             className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full self-start"
             style={{
@@ -182,7 +175,6 @@ export default function LoginPage() {
             </span>
           </div>
 
-          {/* ── Headline ── */}
           <h1
             className="text-4xl xl:text-[2.65rem] font-black leading-[1.1] text-white"
             style={{ letterSpacing: "-0.035em", marginBottom: "1.1rem" }}
@@ -212,7 +204,7 @@ export default function LoginPage() {
             desde cualquier dispositivo.
           </p>
 
-          {/* ── Dashboard mockup ── */}
+          {/* Dashboard mockup */}
           <div
             style={{
               borderRadius: "16px",
@@ -224,7 +216,6 @@ export default function LoginPage() {
               marginBottom: "2rem",
             }}
           >
-            {/* browser bar */}
             <div
               className="flex items-center gap-1.5 px-4 py-2.5"
               style={{
@@ -256,7 +247,6 @@ export default function LoginPage() {
                 app.cronix.io
               </div>
             </div>
-            {/* mini dashboard */}
             <div className="flex" style={{ minHeight: "128px" }}>
               <div
                 className="flex-shrink-0 p-2.5 space-y-1"
@@ -365,7 +355,6 @@ export default function LoginPage() {
             </div>
           </div>
 
-          {/* ── Features 2×2 ── */}
           <div className="grid grid-cols-2 gap-2.5 mt-auto">
             {FEATURES.map(({ icon: Icon, title, desc }) => (
               <div
@@ -418,9 +407,7 @@ export default function LoginPage() {
         </div>
       </div>
 
-      {/* ═══════════════════════════════════════
-          FORM PANEL — full width mobile, 54% desktop
-      ═══════════════════════════════════════ */}
+      {/* ── FORM PANEL ── */}
       <div
         className="flex-1 flex flex-col items-center justify-center relative overflow-hidden"
         style={{
@@ -428,7 +415,6 @@ export default function LoginPage() {
           padding: "clamp(2rem,6vw,5rem) clamp(1.25rem,8vw,5rem)",
         }}
       >
-        {/* ambient orb */}
         <div
           style={{
             position: "absolute",
@@ -437,14 +423,14 @@ export default function LoginPage() {
             width: "280px",
             height: "280px",
             borderRadius: "50%",
+            pointerEvents: "none",
             background:
               "radial-gradient(circle,rgba(56,132,255,0.06) 0%,transparent 70%)",
-            pointerEvents: "none",
           }}
         />
 
         <div className="w-full relative z-10" style={{ maxWidth: "400px" }}>
-          {/* ── MOBILE header — logo + Cronix wordmark centered ── */}
+          {/* Mobile logo */}
           <Link
             href="/"
             className="flex flex-col items-center lg:hidden"
@@ -493,7 +479,6 @@ export default function LoginPage() {
             </p>
           </Link>
 
-          {/* heading */}
           <h1
             className="font-black text-white"
             style={{
@@ -510,34 +495,86 @@ export default function LoginPage() {
             Inicia sesión para gestionar tu negocio
           </p>
 
-          {/* form */}
           <form
             onSubmit={handleSubmit}
             style={{ display: "flex", flexDirection: "column", gap: "1rem" }}
           >
+            {/* ── Error banner estilo GitHub/Notion ── */}
             {error && (
               <div
-                className="flex items-start gap-2.5 animate-fade-in"
+                className="animate-fade-in"
                 style={{
-                  padding: "0.875rem",
+                  padding: "0.875rem 1rem",
                   borderRadius: "12px",
                   background: "rgba(255,59,48,0.08)",
                   border: "1px solid rgba(255,59,48,0.2)",
-                  color: "#FF6B6B",
                 }}
               >
-                <AlertCircle
-                  size={16}
-                  style={{ marginTop: "1px", flexShrink: 0 }}
-                />
-                <p style={{ fontSize: "13px", fontWeight: 500 }}>{error}</p>
+                <div
+                  className="flex items-start gap-2.5"
+                  style={{ marginBottom: "0.5rem" }}
+                >
+                  <AlertCircle
+                    size={16}
+                    style={{
+                      color: "#FF6B6B",
+                      marginTop: "1px",
+                      flexShrink: 0,
+                    }}
+                  />
+                  <p
+                    style={{
+                      fontSize: "13px",
+                      fontWeight: 500,
+                      color: "#FF6B6B",
+                    }}
+                  >
+                    {error}
+                  </p>
+                </div>
+                {/* Caminos de salida — estilo GitHub */}
+                <div
+                  className="flex items-center gap-3"
+                  style={{ paddingLeft: "1.5rem" }}
+                >
+                  <Link
+                    href="/register"
+                    className="hover:opacity-70 transition-opacity"
+                    style={{
+                      fontSize: "12px",
+                      fontWeight: 700,
+                      color: "#FF6B6B",
+                      textDecoration: "underline",
+                    }}
+                  >
+                    ¿No tienes cuenta? Regístrate
+                  </Link>
+                  <span
+                    style={{ color: "rgba(255,107,107,0.3)", fontSize: "12px" }}
+                  >
+                    ·
+                  </span>
+                  <Link
+                    href="/forgot-password"
+                    className="hover:opacity-70 transition-opacity"
+                    style={{
+                      fontSize: "12px",
+                      fontWeight: 700,
+                      color: "#FF6B6B",
+                      textDecoration: "underline",
+                    }}
+                  >
+                    Recuperar contraseña
+                  </Link>
+                </div>
               </div>
             )}
 
+            {/* Email */}
             <div>
               <label
-                className="block"
                 htmlFor="email"
+                className="block"
                 style={{
                   fontSize: "11px",
                   fontWeight: 700,
@@ -582,6 +619,7 @@ export default function LoginPage() {
               )}
             </div>
 
+            {/* Password */}
             <div>
               <div
                 className="flex items-center justify-between"
@@ -632,6 +670,7 @@ export default function LoginPage() {
               )}
             </div>
 
+            {/* Submit */}
             <button
               type="submit"
               disabled={isPending}
@@ -644,11 +683,11 @@ export default function LoginPage() {
                 color: "#fff",
                 fontSize: "14px",
                 fontWeight: 700,
+                border: "none",
+                cursor: "pointer",
                 boxShadow: isPending
                   ? "none"
                   : "0 0 24px rgba(56,132,255,0.35),0 4px 12px rgba(56,132,255,0.2)",
-                border: "none",
-                cursor: "pointer",
               }}
             >
               {isPending ? (
@@ -679,7 +718,7 @@ export default function LoginPage() {
               )}
             </button>
 
-            {/* divider */}
+            {/* Divider */}
             <div className="relative" style={{ margin: "0.25rem 0" }}>
               <div
                 style={{
@@ -713,6 +752,7 @@ export default function LoginPage() {
               </div>
             </div>
 
+            {/* Google */}
             <button
               type="button"
               onClick={() => signInWithGoogle()}
