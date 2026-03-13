@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -29,7 +29,7 @@ const OAUTH_ERROR_MESSAGES: Record<NonNullable<OAuthError>, { title: string; bod
 }
 
 // ── Component ──────────────────────────────────────────────────────────────
-export default function RegisterPage() {
+function RegisterContent() {
   const searchParams = useSearchParams();
 
   // Read ?error= from URL (set by /auth/callback when Google user isn't registered)
@@ -552,5 +552,20 @@ export default function RegisterPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: "#060608" }}>
+        <div className="flex flex-col items-center gap-4">
+          <div className="h-12 w-12 rounded-xl border border-brand-500/20 bg-brand-500/5 animate-pulse" />
+          <p className="text-muted-foreground text-sm animate-pulse tracking-widest uppercase font-bold">Cargando...</p>
+        </div>
+      </div>
+    }>
+      <RegisterContent />
+    </Suspense>
   );
 }
