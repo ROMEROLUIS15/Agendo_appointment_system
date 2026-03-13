@@ -20,7 +20,7 @@ export default function ProfilePage() {
   const [isPending, startTransition] = useTransition()
   const [changePassword, setChangePassword] = useState(false)
   
-  const [phoneCountry, setPhoneCountry] = useState<Country>(COUNTRIES[1])
+  const [phoneCountry, setPhoneCountry] = useState<Country>(COUNTRIES[1] as Country)
   const [localPhone, setLocalPhone] = useState('')
 
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -36,7 +36,7 @@ export default function ProfilePage() {
         setAvatarUrl(dbUser?.avatar_url ?? null)
 
         const parsed = parsePhone(dbUser?.phone)
-        setPhoneCountry(parsed.country || COUNTRIES[1])
+        setPhoneCountry(parsed.country)
         setLocalPhone(parsed.local)
       }
       setLoading(false)
