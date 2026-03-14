@@ -1,6 +1,6 @@
 {
-  "name": "Agendo",
-  "short_name": "Agendo",
+  "name": "Cronix",
+  "short_name": "Cronix",
   "description": "Gestión de citas y turnos para profesionales.",
   "start_url": "/dashboard",
   "display": "standalone",
