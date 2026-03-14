@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -26,7 +26,7 @@ const OAUTH_ERROR_MESSAGES: Record<NonNullable<OAuthError>, { title: string; bod
   },
 }
 
-export default function RegisterPage() {
+function RegisterForm() {
   const searchParams = useSearchParams();
   const rawError    = searchParams.get("error") as OAuthError;
   const oauthError  = rawError && rawError in OAUTH_ERROR_MESSAGES ? rawError : null;
@@ -413,5 +413,17 @@ export default function RegisterPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: "#060608" }}>
+        <div className="animate-pulse" style={{ color: "#3884FF" }}>Cargando...</div>
+      </div>
+    }>
+      <RegisterForm />
+    </Suspense>
   );
 }
