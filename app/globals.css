@@ -43,20 +43,38 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     -webkit-text-size-adjust: 100%;
+    /*
+      CRITICAL: Do NOT set overflow-y here.
+      When html + body both have overflow:hidden, browsers consume wheel events
+      at the document root and the inner <main> scroll container never receives
+      them. Only overflow-x is blocked to prevent horizontal layout breaks.
+    */
     overflow-x: hidden;
+    height: 100%;
     background-color: #0f0f12;
   }
   
   * {
     @apply border-border;
   }
+
+  /* Prevent any element from punching outside its column */
+  img, video, iframe, table, canvas, svg {
+    max-width: 100%;
+  }
   
   body {
+    height: 100%;
     background-color: #0f0f12;
     color: #f2f2f2;
     -webkit-tap-highlight-color: transparent;
     -webkit-touch-callout: none;
-    overscroll-behavior-y: none;
+    /*
+      CRITICAL: Do NOT set overflow:hidden on body.
+      The shell div (.flex.h-screen.overflow-hidden) clips the layout.
+      Setting overflow:hidden here prevents wheel events from reaching <main>.
+      Only block horizontal overflow to prevent layout breaks.
+    */
     overflow-x: hidden;
     width: 100%;
     position: relative;
@@ -67,12 +85,16 @@
     padding-right: env(safe-area-inset-right);
   }
 
-  /* Scroll lock when sidebar/panel is open on mobile */
+  /* Scroll lock — only blocks the <main> scroll region on mobile when the sidebar is open.
+     On desktop (lg+) the sidebar is always visible so we never need to lock. */
   @media (max-width: 1023px) {
-    body.scroll-locked,
+    body.scroll-locked {
+      overflow: hidden !important;
+    }
     body.scroll-locked main {
       overflow: hidden !important;
       touch-action: none;
+      overscroll-behavior: none;
     }
   }
 

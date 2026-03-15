@@ -60,7 +60,8 @@ export function Sidebar({
 
       <aside
         className={cn(
-          "flex flex-col h-full w-64 flex-shrink-0",
+          // w-64 on lg+; cap to 85vw on tiny phones to prevent overflow
+          "flex flex-col h-full w-64 max-w-[85vw] flex-shrink-0",
           // Mobile: fixed overlay
           "fixed top-0 left-0 z-40 lg:static lg:z-auto",
           "transition-transform duration-300 ease-in-out",

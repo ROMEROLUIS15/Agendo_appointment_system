@@ -68,7 +68,10 @@ export function DashboardShell({ children, user, business }: DashboardShellProps
   }, [sidebarOpen])
 
   return (
-    <div className="flex h-screen overflow-hidden" style={{ backgroundColor: '#0F0F12' }}>
+    <div
+      className="flex w-full"
+      style={{ height: '100vh', overflow: 'hidden', backgroundColor: '#0F0F12' }}
+    >
 
       {/* Sidebar — desktop */}
       <div className="hidden lg:flex lg:flex-shrink-0">
@@ -85,19 +88,33 @@ export function DashboardShell({ children, user, business }: DashboardShellProps
         />
       </div>
 
-      {/* Main area */}
-      <div className="flex flex-1 flex-col overflow-hidden min-w-0">
+      {/* Main column: fills remaining space, clips overflow except on main */}
+      <div className="flex flex-1 flex-col min-w-0" style={{ overflow: 'hidden' }}>
         <Topbar
           title={title}
           subtitle={subtitle}
           onMenuClick={() => setSidebarOpen(prev => !prev)}
           user={user}
         />
+        {/*
+          SCROLL CONTRACT:
+          overflow-y: scroll  — always-active; wheel events always reach this node.
+          overscroll-behavior: contain — no bounce propagation without blocking wheel.
+          min-height: 0  — mandatory on flex children; prevents flex blowout.
+          All three are set via inline style (never Tailwind) to prevent any class
+          purge or specificity issue from breaking scroll at runtime.
+        */}
         <main
-          className="flex-1 overflow-y-auto overflow-x-hidden"
-          style={{ backgroundColor: '#0F0F12' }}
+          id="main-scroll"
+          className="flex-1 overflow-x-hidden"
+          style={{
+            overflowY: 'scroll',
+            overscrollBehavior: 'contain',
+            minHeight: 0,
+            backgroundColor: '#0F0F12',
+          }}
         >
-          <div className="p-3 sm:p-4 md:p-6 max-w-7xl mx-auto w-full">
+          <div className="p-3 sm:p-4 md:p-6 max-w-7xl mx-auto w-full min-w-0">
             {children}
           </div>
         </main>
