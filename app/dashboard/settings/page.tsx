@@ -579,8 +579,8 @@ export default function SettingsPage() {
       </Card>
 
       <Card style={{ border: "1px solid rgba(0,98,255,0.2)" }}>
-        <div className="flex items-center justify-between flex-wrap gap-3">
-          <div>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="min-w-0">
             <p className="text-sm font-semibold" style={{ color: "#F2F2F2" }}>
               Plan actual: {biz?.plan ?? "free"}
             </p>
@@ -588,7 +588,9 @@ export default function SettingsPage() {
               Acceso completo a todas las funcionalidades
             </p>
           </div>
-          <Button variant="secondary">Gestionar plan</Button>
+          <Button variant="secondary" className="w-full sm:w-auto flex-shrink-0">
+            Gestionar plan
+          </Button>
         </div>
       </Card>
     </div>

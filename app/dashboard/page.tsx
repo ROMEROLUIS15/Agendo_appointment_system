@@ -401,49 +401,88 @@ export default function DashboardPage() {
             </p>
           </div>
 
-          {/* Tabs + Actions — stack on mobile, row on sm+ */}
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-            {/* View Tabs */}
-            <div className="flex items-center gap-2">
-              {(["agenda", "resumen"] as const).map((t) => (
-                <button
-                  key={t}
-                  onClick={() => setTab(t)}
-                  className="flex-1 sm:flex-none px-4 py-2 text-sm font-semibold rounded-xl transition-all duration-200 flex items-center justify-center gap-2"
-                  style={
-                    tab === t
-                      ? { background: "#0062FF", color: "#fff", border: "1px solid #0062FF" }
-                      : { background: "rgba(0,98,255,0.1)", color: "#3884FF", border: "1px solid rgba(0,98,255,0.2)" }
-                  }
-                >
-                  {t === "agenda" ? <><CalendarDays size={15} /> <span>Agenda</span></> : <><BarChart3 size={15} /> <span>Resumen</span></>}
-                </button>
-              ))}
-            </div>
-
-            {/* Action buttons */}
-            <div className="flex items-center gap-2 sm:ml-auto">
-              <Link href="/dashboard/clients/new" className="flex-1 sm:flex-none">
-                <Button
-                  variant="secondary"
-                  className="w-full justify-center text-sm px-3 sm:px-4 py-2 rounded-xl font-semibold"
-                  style={{ background: "rgba(0,98,255,0.08)", color: "#3884FF", border: "1px solid rgba(0,98,255,0.2)" }}
-                  leftIcon={<User size={15} />}
-                >
-                  <span className="hidden xs:inline">Nuevo </span>Cliente
-                </Button>
-              </Link>
-              <Link href="/dashboard/appointments/new" className="flex-1 sm:flex-none">
-                <Button
-                  variant="primary"
-                  className="w-full justify-center text-sm px-3 sm:px-4 py-2 rounded-xl font-semibold"
-                  leftIcon={<Plus size={15} />}
-                >
-                  Nueva Cita
-                </Button>
-              </Link>
-            </div>
+          {/* Tabs + Actions
+              Mobile:  two rows — tabs on top, action buttons below (full width)
+              sm+:     single compact row — all 4 buttons together, no spreading
+          */}
+          {/* — Mobile: stacked — */}
+          <div className="flex items-center gap-2 sm:hidden">
+            {(["agenda", "resumen"] as const).map((t) => (
+              <button
+                key={t}
+                onClick={() => setTab(t)}
+                className="flex-1 px-4 py-2 text-sm font-semibold rounded-xl transition-all duration-200 flex items-center justify-center gap-2"
+                style={
+                  tab === t
+                    ? { background: "#0062FF", color: "#fff", border: "1px solid #0062FF" }
+                    : { background: "rgba(0,98,255,0.1)", color: "#3884FF", border: "1px solid rgba(0,98,255,0.2)" }
+                }
+              >
+                {t === "agenda" ? <><CalendarDays size={15} /><span>Agenda</span></> : <><BarChart3 size={15} /><span>Resumen</span></>}
+              </button>
+            ))}
           </div>
+          <div className="flex items-center gap-2 sm:hidden">
+            <Link href="/dashboard/clients/new" className="flex-1">
+              <Button
+                variant="secondary"
+                className="w-full justify-center text-sm px-3 py-2 rounded-xl font-semibold"
+                style={{ background: "rgba(0,98,255,0.08)", color: "#3884FF", border: "1px solid rgba(0,98,255,0.2)" }}
+                leftIcon={<User size={15} />}
+              >
+                Nuevo Cliente
+              </Button>
+            </Link>
+            <Link href="/dashboard/appointments/new" className="flex-1">
+              <Button
+                variant="primary"
+                className="w-full justify-center text-sm px-3 py-2 rounded-xl font-semibold"
+                leftIcon={<Plus size={15} />}
+              >
+                Nueva Cita
+              </Button>
+            </Link>
+          </div>
+
+          {/* — sm+: all 4 in a compact grouped row — */}
+          <div className="hidden sm:flex items-center gap-2">
+            {(["agenda", "resumen"] as const).map((t) => (
+              <button
+                key={t}
+                onClick={() => setTab(t)}
+                className="px-4 py-2 text-sm font-semibold rounded-xl transition-all duration-200 flex items-center gap-2"
+                style={
+                  tab === t
+                    ? { background: "#0062FF", color: "#fff", border: "1px solid #0062FF" }
+                    : { background: "rgba(0,98,255,0.1)", color: "#3884FF", border: "1px solid rgba(0,98,255,0.2)" }
+                }
+              >
+                {t === "agenda" ? <><CalendarDays size={15} /><span>Agenda</span></> : <><BarChart3 size={15} /><span>Resumen</span></>}
+              </button>
+            ))}
+            {/* Subtle divider */}
+            <div style={{ width: 1, height: 24, background: "rgba(255,255,255,0.08)", flexShrink: 0 }} />
+            <Link href="/dashboard/clients/new">
+              <Button
+                variant="secondary"
+                className="text-sm px-4 py-2 rounded-xl font-semibold"
+                style={{ background: "rgba(0,98,255,0.08)", color: "#3884FF", border: "1px solid rgba(0,98,255,0.2)" }}
+                leftIcon={<User size={15} />}
+              >
+                Nuevo Cliente
+              </Button>
+            </Link>
+            <Link href="/dashboard/appointments/new">
+              <Button
+                variant="primary"
+                className="text-sm px-4 py-2 rounded-xl font-semibold"
+                leftIcon={<Plus size={15} />}
+              >
+                Nueva Cita
+              </Button>
+            </Link>
+          </div>
+
         </div>
 
         <ServicesOnboardingBanner businessId={businessId ?? ""} />
