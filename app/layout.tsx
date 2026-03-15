@@ -7,13 +7,13 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   /*
-    viewportFit: 'cover' is REQUIRED for env(safe-area-inset-*) to return
-    non-zero values on iOS notched devices and Android gesture-nav phones.
-    Without this, the browser constrains the layout above the system chrome
-    and all safe-area env vars are 0 — causing content to be clipped at the
-    bottom behind the Android nav bar on some devices.
+    NOTE: viewportFit:'cover' was intentionally NOT set here.
+    Setting it causes env(safe-area-inset-top) on <body> to become
+    non-zero (e.g. 44px on iPhone), which pushes the 100vh dashboard
+    shell below the visible screen bottom — hiding the bottom nav.
+    The 80px fixed fallback in globals.css covers all Android nav bars
+    without needing viewport-fit:cover.
   */
-  viewportFit: 'cover',
 }
 
 // ── Metadata ──────────────────────────────────────────────────────────────────
