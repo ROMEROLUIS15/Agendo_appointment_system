@@ -381,7 +381,7 @@ export default function DashboardPage() {
     <div className="flex h-full relative overflow-hidden">
       {/* ── MAIN CONTENT ─────────────────────────────────────── */}
       <div
-        className={`flex-1 min-w-0 space-y-5 animate-fade-in transition-all duration-300
+        className={`flex-1 min-w-0 space-y-5 animate-fade-in transition-all duration-300 overflow-y-auto
         ${dayPanelOpen || panelOpen ? "lg:mr-80 xl:mr-96" : ""}`}
       >
         {/* Header */}

@@ -68,9 +68,12 @@
   }
 
   /* Scroll lock when sidebar/panel is open on mobile */
-  body.scroll-locked {
-    overflow: hidden;
-    touch-action: none;
+  @media (max-width: 1023px) {
+    body.scroll-locked,
+    body.scroll-locked main {
+      overflow: hidden !important;
+      touch-action: none;
+    }
   }
 
   button,
