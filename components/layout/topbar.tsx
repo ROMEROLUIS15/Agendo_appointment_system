@@ -13,7 +13,7 @@ interface TopbarProps {
 export function Topbar({ title, subtitle, actions, onMenuClick }: TopbarProps) {
   return (
     <header
-      className="sticky top-0 z-20 flex h-14 sm:h-16 items-center gap-3 px-3 sm:px-6"
+      className="relative z-10 flex h-14 sm:h-16 items-center gap-3 px-3 sm:px-6 flex-shrink-0"
       style={{
         backgroundColor: "rgba(15,15,18,0.9)",
         backdropFilter: "blur(12px)",

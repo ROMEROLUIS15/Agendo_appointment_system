@@ -69,8 +69,8 @@ export function DashboardShell({ children, user, business }: DashboardShellProps
 
   return (
     <div
-      className="flex w-full"
-      style={{ height: '100vh', overflow: 'hidden', backgroundColor: '#0F0F12' }}
+      className="shell-height flex w-full overflow-hidden"
+      style={{ backgroundColor: '#0F0F12' }}
     >
 
       {/* Sidebar — desktop */}
