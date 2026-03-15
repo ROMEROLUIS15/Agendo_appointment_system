@@ -927,7 +927,7 @@ export default function DashboardPage() {
               </div>
               <div className="flex items-center gap-2">
                 <Link
-                  href="/dashboard/appointments/new"
+                  href={`/dashboard/appointments/new?date=${format(selectedDate, 'yyyy-MM-dd')}`}
                   className="p-2 rounded-xl transition-colors"
                   style={{ background: "rgba(0,98,255,0.1)", color: "#0062FF" }}
                   title="Nueva cita"
@@ -978,7 +978,7 @@ export default function DashboardPage() {
                     No hay citas agendadas para este día
                   </p>
                   <Link
-                    href="/dashboard/appointments/new"
+                    href={`/dashboard/appointments/new?date=${format(selectedDate, 'yyyy-MM-dd')}`}
                     className="btn-primary text-xs px-4 py-2 rounded-xl flex items-center gap-2"
                   >
                     <Plus size={14} /> Agendar cita
