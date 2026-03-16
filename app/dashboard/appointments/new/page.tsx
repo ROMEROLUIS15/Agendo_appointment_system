@@ -404,13 +404,21 @@ function NewAppointmentForm() {
               <select
                 required
                 value={form.service_id}
-                onChange={e => setForm(f => ({ ...f, service_id: e.target.value }))}
+                onChange={e => {
+                  if (e.target.value === 'new-service') {
+                    router.push('/dashboard/services')
+                    return
+                  }
+                  setForm(f => ({ ...f, service_id: e.target.value }))
+                }}
                 className="input-base bg-card"
               >
                 <option value="">Selecciona un servicio...</option>
                 {services.map(s => (
                   <option key={s.id} value={s.id}>{s.name} – {s.duration_min} min</option>
                 ))}
+                <option value="disabled-separator" disabled>─────────────────────────</option>
+                <option value="new-service" className="text-brand-600 font-bold">✨ Añadir nuevo servicio...</option>
               </select>
               {selectedService && (
                 <p className="mt-1.5 text-xs text-muted-foreground flex items-center gap-1">

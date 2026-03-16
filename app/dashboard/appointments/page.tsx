@@ -35,8 +35,9 @@ export default function AppointmentsPage() {
   const fetchAppointments = useCallback(async () => {
     if (!businessId) return
     setLoading(true)
-    const startOfDay = format(date, 'yyyy-MM-dd')
-    const endOfDay = format(new Date(date.getTime() + 24 * 60 * 60 * 1000 - 1), 'yyyy-MM-dd HH:mm:ss')
+    const dateStr = format(date, 'yyyy-MM-dd')
+    const startOfDay = new Date(`${dateStr}T00:00:00`).toISOString()
+    const endOfDay = new Date(`${dateStr}T23:59:59.999`).toISOString()
 
     const { data, error } = await supabase
       .from('appointments')

@@ -83,7 +83,7 @@ export default function ClientsPage() {
             placeholder="Buscar por nombre, teléfono, email o etiqueta..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            className="w-full bg-[#16161A]/80 backdrop-blur-xl border border-brand-500/10 hover:border-brand-500/30 focus:border-brand-500/50 rounded-2xl py-3.5 pl-12 pr-12 text-sm text-[#F2F2F2] placeholder-[#5A5A62] outline-none transition-all duration-300 focus:ring-4 focus:ring-brand-500/10 shadow-2xl"
+            className="w-full bg-[#16161A]/80 backdrop-blur-xl border border-brand-500/50 hover:border-brand-500/70 focus:border-brand-500 rounded-2xl py-3.5 pl-12 pr-12 text-sm text-[#F2F2F2] placeholder-[#5A5A62] outline-none transition-all duration-300 focus:ring-4 focus:ring-brand-500/20 shadow-2xl"
           />
           
           {/* Action clues / Clear button */}
