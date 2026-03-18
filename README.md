@@ -1,4 +1,4 @@
-# 🗓️ Agendo — Appointment Management SaaS
+# 🗓️ Cronix — Appointment Management SaaS
 
 > Plataforma SaaS para gestión de citas, clientes, servicios y finanzas. Diseñada para negocios de servicios como salones, consultorios, estudios y cualquier negocio que trabaje por citas.
 
