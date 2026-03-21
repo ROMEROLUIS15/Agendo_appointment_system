@@ -1,0 +1,194 @@
+/**
+ * Appointments Use Case — Pure business logic for appointment operations.
+ *
+ * NO framework dependencies (no React, no Next.js, no Supabase).
+ * Receives data, applies rules, returns results.
+ *
+ * Exposes:
+ *  - evaluateDoubleBooking:     warn/block if client has multiple citas in a day
+ *  - checkSlotOverlap:          detect time slot conflicts
+ *  - getLocalDayBoundaries:     timezone-correct date range for queries
+ *  - isExpiredAppointment:      check if appointment should auto-resolve
+ *  - resolveExpiredAppointments: batch resolve expired from a list
+ *  - buildAppointmentPayload:   calculate end_at from start + duration
+ */
+
+import type { DoubleBookingLevel, DoubleBookingCheckResult, AppointmentStatus } from '@/types'
+
+// ── Types ─────────────────────────────────────────────────────────────────
+
+interface DaySlot {
+  time:    string
+  service: string
+}
+
+interface BookingCheckParams {
+  existingCount: number
+  existingSlots: DaySlot[]
+}
+
+export const DoubleBookingWarningLevel = {
+  ALLOWED: 'allowed' as DoubleBookingLevel,
+  WARN:    'warn'    as DoubleBookingLevel,
+  BLOCKED: 'blocked' as DoubleBookingLevel,
+} as const
+
+// ── Double Booking ────────────────────────────────────────────────────────
+
+/**
+ * Evaluates whether a client can be booked on a given day.
+ * Rule: max 1 extra booking per day (warn), blocked at 2+.
+ */
+export function evaluateDoubleBooking(
+  params: BookingCheckParams
+): DoubleBookingCheckResult {
+  const { existingCount, existingSlots } = params
+
+  if (existingCount === 0) {
+    return {
+      level:         'allowed',
+      existingCount: 0,
+      existingSlots: [],
+      message:       '',
+    }
+  }
+
+  if (existingCount === 1) {
+    const slot = existingSlots[0]
+    return {
+      level:         'warn',
+      existingCount: 1,
+      existingSlots,
+      message:       `Este cliente ya tiene 1 cita ese día${slot ? ` (${slot.time} — ${slot.service})` : ''}. ¿Agregar una segunda cita?`,
+    }
+  }
+
+  return {
+    level:         'blocked',
+    existingCount,
+    existingSlots,
+    message:       `Este cliente ya tiene ${existingCount} citas ese día. Límite de doble agenda alcanzado.`,
+  }
+}
+
+// ── Slot Overlap ──────────────────────────────────────────────────────────
+
+/**
+ * Checks if a proposed time slot overlaps with any existing appointment.
+ *
+ * Overlap condition:
+ *   proposedStart < existingEnd AND proposedEnd > existingStart
+ */
+export function checkSlotOverlap(params: {
+  proposedStart: Date
+  proposedEnd:   Date
+  existing: Array<{ start_at: string; end_at: string; id?: string }>
+  excludeId?:    string
+}): { overlaps: boolean; conflictTime?: string } {
+  const { proposedStart, proposedEnd, existing, excludeId } = params
+
+  for (const apt of existing) {
+    if (excludeId && apt.id === excludeId) continue
+
+    const existStart = new Date(apt.start_at)
+    const existEnd   = new Date(apt.end_at)
+
+    const overlaps =
+      proposedStart < existEnd &&
+      proposedEnd   > existStart
+
+    if (overlaps) {
+      return {
+        overlaps:    true,
+        conflictTime: existStart.toLocaleTimeString('es-CO', {
+          hour:   '2-digit',
+          minute: '2-digit',
+        }),
+      }
+    }
+  }
+
+  return { overlaps: false }
+}
+
+// ── Date Boundaries ───────────────────────────────────────────────────────
+
+/**
+ * Returns local day boundaries as ISO strings for range queries.
+ * Fixes timezone bug: datetime-local inputs are in local time, not UTC.
+ */
+export function getLocalDayBoundaries(localDatetimeStr: string): {
+  start: string
+  end:   string
+} {
+  const dateStr  = localDatetimeStr.split('T')[0]
+  const dayStart = new Date(`${dateStr}T00:00:00`)
+  const dayEnd   = new Date(`${dateStr}T23:59:59.999`)
+  return {
+    start: dayStart.toISOString(),
+    end:   dayEnd.toISOString(),
+  }
+}
+
+// ── Expired Appointment Resolution ────────────────────────────────────────
+
+/**
+ * Returns true if the appointment's end_at is in the past
+ * and it hasn't been resolved (still pending or confirmed).
+ */
+export function isExpiredAppointment(apt: {
+  end_at: string
+  status: string
+}): boolean {
+  const unresolved = ['pending', 'confirmed']
+  return unresolved.includes(apt.status) && new Date(apt.end_at) < new Date()
+}
+
+/**
+ * Resolves expired appointments in a list by changing their status.
+ * Pure function: returns new array, does NOT mutate input.
+ */
+export function resolveExpiredAppointments<T extends { end_at: string; status: string }>(
+  appointments: T[],
+  resolvedStatus: AppointmentStatus = 'completed'
+): T[] {
+  const now = new Date()
+  return appointments.map(apt => {
+    if (isExpiredAppointment(apt)) {
+      return { ...apt, status: resolvedStatus }
+    }
+    return apt
+  })
+}
+
+// ── Payload Builder ───────────────────────────────────────────────────────
+
+/**
+ * Calculates the end_at from a start time and service duration.
+ * Pure function — no side effects.
+ */
+export function buildAppointmentPayload(params: {
+  startAt: string
+  durationMin: number
+  clientId: string
+  serviceId: string
+  assignedUserId: string | null
+  notes: string | null
+  businessId: string
+  isDualBooking: boolean
+}) {
+  const startObj = new Date(params.startAt)
+  const endObj   = new Date(startObj.getTime() + params.durationMin * 60_000)
+
+  return {
+    business_id:      params.businessId,
+    client_id:        params.clientId,
+    service_id:       params.serviceId,
+    assigned_user_id: params.assignedUserId,
+    start_at:         startObj.toISOString(),
+    end_at:           endObj.toISOString(),
+    notes:            params.notes,
+    status:           'pending' as const,
+    is_dual_booking:  params.isDualBooking,
+  }
+}

@@ -6,15 +6,12 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { createClient } from '@/lib/supabase/client'
-import type { Database } from '@/types/database.types'
-
-type PaymentMethod = Database['public']['Enums']['payment_method']
+import { useBusinessContext } from '@/lib/hooks/use-business-context'
+import type { PaymentMethod } from '@/types'
 
 export default function NewFinancePage() {
   const router = useRouter()
-  const supabase = createClient()
-  const [businessId, setBusinessId] = useState<string | null>(null)
+  const { supabase, businessId } = useBusinessContext()
 
   const [form, setForm] = useState({
     amount:    '',
@@ -23,17 +20,6 @@ export default function NewFinancePage() {
     date:      new Date().toISOString().split('T')[0],
   })
   const [saving, setSaving] = useState(false)
-
-  useEffect(() => {
-    async function init() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      const { data: dbUser } = await supabase
-        .from('users').select('business_id').eq('id', user.id).single()
-      if (dbUser?.business_id) setBusinessId(dbUser.business_id)
-    }
-    init()
-  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

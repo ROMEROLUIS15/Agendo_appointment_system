@@ -12,88 +12,56 @@ import {
   formatCurrency, formatDate,
   paymentMethodLabels, expenseCategoryLabels,
 } from '@/lib/utils'
-import { createClient } from '@/lib/supabase/client'
-
-// ── Types ──────────────────────────────────────────────────────────────────
-interface Transaction {
-  id:         string
-  net_amount: number
-  method:     string
-  discount:   number | null
-  paid_at:    string | null
-}
-
-interface Expense {
-  id:           string
-  amount:       number
-  category:     string | null
-  description:  string | null
-  expense_date: string | null
-}
-
-interface Summary {
-  totalRevenue:  number
-  totalExpenses: number
-  netProfit:     number
-}
+import { useBusinessContext } from '@/lib/hooks/use-business-context'
+import * as financesRepo from '@/lib/repositories/finances.repo'
+import type { TransactionRow, ExpenseRow, PaymentMethod, ExpenseCategory } from '@/types'
 
 // ── Component ──────────────────────────────────────────────────────────────
 export default function FinancesPage() {
-  const supabase = createClient()
+  const { supabase, businessId, loading: contextLoading } = useBusinessContext()
 
   const [loading,            setLoading]            = useState(true)
-  const [summary,            setSummary]            = useState<Summary>({ totalRevenue: 0, totalExpenses: 0, netProfit: 0 })
-  const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([])
-  const [recentExpenses,     setRecentExpenses]     = useState<Expense[]>([])
+  const [summary,            setSummary]            = useState({ totalRevenue: 0, totalExpenses: 0, netProfit: 0 })
+  const [recentTransactions, setRecentTransactions] = useState<TransactionRow[]>([])
+  const [recentExpenses,     setRecentExpenses]     = useState<ExpenseRow[]>([])
 
   useEffect(() => {
+    if (!businessId) {
+      if (!contextLoading) setLoading(false)
+      return
+    }
+
     async function loadData() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+      try {
+        const [txns, exps] = await Promise.all([
+          financesRepo.getTransactions(supabase, businessId!),
+          financesRepo.getExpenses(supabase, businessId!),
+        ])
 
-      const { data: dbUser } = await supabase
-        .from('users')
-        .select('business_id')
-        .eq('id', user.id)
-        .single()
+        // Filter to current month
+        const startOfMonth = new Date(
+          new Date().getFullYear(),
+          new Date().getMonth(),
+          1,
+        ).toISOString()
 
-      if (!dbUser?.business_id) { setLoading(false); return }
+        const monthTxns = txns.filter(t => (t.paid_at ?? '') >= startOfMonth)
+        const monthExps = exps.filter(e => (e.expense_date ?? '') >= startOfMonth)
 
-      const bId = dbUser.business_id
-      const startOfMonth = new Date(
-        new Date().getFullYear(),
-        new Date().getMonth(),
-        1,
-      ).toISOString()
+        const totalRevenue  = monthTxns.reduce((acc, t) => acc + (t.net_amount ?? 0), 0)
+        const totalExpenses = monthExps.reduce((acc, e) => acc + (e.amount     ?? 0), 0)
 
-      const [txnRes, expRes] = await Promise.all([
-        supabase
-          .from('transactions')
-          .select('id, net_amount, method, discount, paid_at')
-          .eq('business_id', bId)
-          .gte('paid_at', startOfMonth)
-          .order('paid_at', { ascending: false }),
-        supabase
-          .from('expenses')
-          .select('id, amount, category, description, expense_date')
-          .eq('business_id', bId)
-          .gte('expense_date', startOfMonth)
-          .order('expense_date', { ascending: false }),
-      ])
-
-      const txns = (txnRes.data ?? []) as Transaction[]
-      const exps = (expRes.data  ?? []) as Expense[]
-
-      const totalRevenue  = txns.reduce((acc, t) => acc + (t.net_amount ?? 0), 0)
-      const totalExpenses = exps.reduce((acc, e) => acc + (e.amount     ?? 0), 0)
-
-      setRecentTransactions(txns.slice(0, 5))
-      setRecentExpenses(exps.slice(0, 5))
-      setSummary({ totalRevenue, totalExpenses, netProfit: totalRevenue - totalExpenses })
-      setLoading(false)
+        setRecentTransactions(monthTxns.slice(0, 5))
+        setRecentExpenses(monthExps.slice(0, 5))
+        setSummary({ totalRevenue, totalExpenses, netProfit: totalRevenue - totalExpenses })
+      } catch (err) {
+        console.error('Error loading finances:', err)
+      } finally {
+        setLoading(false)
+      }
     }
     loadData()
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [supabase, businessId, contextLoading])
 
   // ── Loading ───────────────────────────────────────────────────────────────
   if (loading) {
@@ -222,7 +190,7 @@ export default function FinancesPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-foreground">
-                      {(paymentMethodLabels as Record<string, string>)[txn.method] ?? 'Pago'}
+                      {paymentMethodLabels[txn.method as PaymentMethod] ?? 'Pago'}
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {txn.paid_at ? formatDate(txn.paid_at, 'd MMM, HH:mm') : '—'}
@@ -276,7 +244,7 @@ export default function FinancesPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-foreground">
-                      {(expenseCategoryLabels as Record<string, string>)[exp.category ?? ''] ?? exp.category ?? 'Gasto'}
+                      {expenseCategoryLabels[exp.category as ExpenseCategory] ?? exp.category ?? 'Gasto'}
                     </p>
                     <p className="text-xs text-muted-foreground truncate">
                       {exp.description ?? '—'}

@@ -24,7 +24,8 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
-import { createClient } from "@/lib/supabase/client";
+import { useBusinessContext } from "@/lib/hooks/use-business-context";
+import * as appointmentsRepo from "@/lib/repositories/appointments.repo";
 import { formatCurrency, formatTime } from "@/lib/utils";
 import { ServicesOnboardingBanner } from "@/components/dashboard/services-onboarding-banner";
 import { AppointmentStatusBadge } from "@/components/ui/badge";
@@ -44,30 +45,7 @@ import {
   subMonths,
 } from "date-fns";
 import { es } from "date-fns/locale";
-import type { AppointmentStatus } from "@/types";
-
-type Apt = {
-  id: string;
-  start_at: string;
-  end_at: string;
-  status: string;
-  is_dual_booking: boolean;
-  notes: string | null;
-  client: {
-    id: string;
-    name: string;
-    phone: string | null;
-    avatar_url: string | null;
-  } | null;
-  service: {
-    id: string;
-    name: string;
-    color: string | null;
-    duration_min: number;
-    price: number;
-  } | null;
-  assigned_user: { id: string; name: string } | null;
-};
+import type { AppointmentStatus, AppointmentWithRelations } from "@/types";
 
 const STATUS_COLORS: Record<string, string> = {
   pending: "#FFD60A",
@@ -78,17 +56,15 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export default function DashboardPage() {
-  const supabase = createClient();
-  const [businessId, setBusinessId] = useState<string | null>(null);
-  const [userName, setUserName] = useState("Usuario");
+  const { supabase, businessId, userName, loading: contextLoading } = useBusinessContext();
   const [tab, setTab] = useState<"agenda" | "resumen">("agenda");
   const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [monthApts, setMonthApts] = useState<Apt[]>([]);
-  const [dayApts, setDayApts] = useState<Apt[]>([]);
+  const [monthApts, setMonthApts] = useState<AppointmentWithRelations[]>([]);
+  const [dayApts, setDayApts] = useState<AppointmentWithRelations[]>([]);
   const [loading, setLoading] = useState(true);
   const [dayLoading, setDayLoading] = useState(false);
-  const [selectedApt, setSelectedApt] = useState<Apt | null>(null);
+  const [selectedApt, setSelectedApt] = useState<AppointmentWithRelations | null>(null);
   const [panelOpen, setPanelOpen] = useState(false);
   const [dayPanelOpen, setDayPanelOpen] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
@@ -101,126 +77,80 @@ export default function DashboardPage() {
     pending: 0,
   });
 
-  // ── Init ──────────────────────────────────────────────────────
-  useEffect(() => {
-    async function init() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
-      const { data: dbUser } = await supabase
-        .from("users")
-        .select("business_id, name")
-        .eq("id", user.id)
-        .single();
-      if (dbUser?.business_id) {
-        setBusinessId(dbUser.business_id);
-        setUserName(dbUser.name?.split(" ")[0] || "Usuario");
-      } else {
-        setLoading(false);
-      }
-    }
-    init();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   // ── Fetch entire month appointments ──────────────────────────
   const fetchMonthApts = useCallback(async () => {
     if (!businessId) return;
     setLoading(true);
-    const start = startOfWeek(startOfMonth(currentMonth), { weekStartsOn: 1 });
-    const end = endOfWeek(endOfMonth(currentMonth), { weekStartsOn: 1 });
-    const { data } = await supabase
-      .from("appointments")
-      .select(
-        `id, start_at, end_at, status, is_dual_booking, notes,
-        client:clients(id, name, phone, avatar_url),
-        service:services(id, name, color, duration_min, price),
-        assigned_user:users(id, name)`,
-      )
-      .eq("business_id", businessId)
-      .gte("start_at", format(start, "yyyy-MM-dd") + "T00:00:00")
-      .lte("start_at", format(end, "yyyy-MM-dd") + "T23:59:59")
-      .order("start_at");
-    setMonthApts((data as Apt[]) ?? []);
-    setLoading(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [businessId, currentMonth]);
+    try {
+      const start = startOfWeek(startOfMonth(currentMonth), { weekStartsOn: 1 });
+      const end = endOfWeek(endOfMonth(currentMonth), { weekStartsOn: 1 });
+      const data = await appointmentsRepo.getMonthAppointments(
+        supabase,
+        businessId,
+        format(start, "yyyy-MM-dd"),
+        format(end, "yyyy-MM-dd"),
+      );
+      setMonthApts(data);
+    } catch (err) {
+      console.error('Error fetching month appointments:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [supabase, businessId, currentMonth]);
 
   // ── Fetch selected day appointments ──────────────────────────
   const fetchDayApts = useCallback(async () => {
     if (!businessId) return;
     setDayLoading(true);
-    const dateStr = format(selectedDate, "yyyy-MM-dd");
-    const { data } = await supabase
-      .from("appointments")
-      .select(
-        `id, start_at, end_at, status, is_dual_booking, notes,
-        client:clients(id, name, phone, avatar_url),
-        service:services(id, name, color, duration_min, price),
-        assigned_user:users(id, name)`,
-      )
-      .eq("business_id", businessId)
-      .gte("start_at", `${dateStr}T00:00:00`)
-      .lte("start_at", `${dateStr}T23:59:59`)
-      .order("start_at");
-    setDayApts((data as Apt[]) ?? []);
-    setDayLoading(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [businessId, selectedDate]);
+    try {
+      const dateStr = format(selectedDate, "yyyy-MM-dd");
+      const data = await appointmentsRepo.getDayAppointments(
+        supabase,
+        businessId,
+        dateStr,
+      );
+      setDayApts(data);
+    } catch (err) {
+      console.error('Error fetching day appointments:', err);
+    } finally {
+      setDayLoading(false);
+    }
+  }, [supabase, businessId, selectedDate]);
 
   // ── Fetch stats ───────────────────────────────────────────────
   const fetchStats = useCallback(async () => {
     if (!businessId) return;
-    const todayStr = format(new Date(), "yyyy-MM-dd");
-    const monthStart = format(
-      new Date(new Date().getFullYear(), new Date().getMonth(), 1),
-      "yyyy-MM-dd",
-    );
-    const [a, b, c, d] = await Promise.all([
-      supabase
-        .from("appointments")
-        .select("id", { count: "exact", head: true })
-        .eq("business_id", businessId)
-        .gte("start_at", `${todayStr}T00:00:00`)
-        .lte("start_at", `${todayStr}T23:59:59`),
-      supabase
-        .from("clients")
-        .select("id", { count: "exact", head: true })
-        .eq("business_id", businessId)
-        .is("deleted_at", null),
-      supabase
-        .from("transactions")
-        .select("net_amount")
-        .eq("business_id", businessId)
-        .gte("paid_at", `${monthStart}T00:00:00`),
-      supabase
-        .from("appointments")
-        .select("id", { count: "exact", head: true })
-        .eq("business_id", businessId)
-        .eq("status", "pending"),
-    ]);
-    setStats({
-      todayCount: a.count ?? 0,
-      totalClients: b.count ?? 0,
-      monthRevenue: (c.data ?? []).reduce(
-        (s: number, t: any) => s + (t.net_amount ?? 0),
-        0,
-      ),
-      pending: d.count ?? 0,
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [businessId]);
+    try {
+      const todayStr = format(new Date(), "yyyy-MM-dd");
+      const monthStart = format(
+        new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+        "yyyy-MM-dd",
+      );
+      const result = await appointmentsRepo.getDashboardStats(
+        supabase,
+        businessId,
+        todayStr,
+        monthStart,
+      );
+      setStats(result);
+    } catch (err) {
+      console.error('Error fetching stats:', err);
+    }
+  }, [supabase, businessId]);
 
   useEffect(() => {
-    fetchMonthApts();
-  }, [fetchMonthApts]);
+    if (!contextLoading && businessId) {
+      fetchMonthApts();
+    } else if (!contextLoading) {
+      setLoading(false);
+    }
+  }, [fetchMonthApts, contextLoading, businessId]);
   useEffect(() => {
     if (dayPanelOpen) fetchDayApts();
   }, [fetchDayApts, dayPanelOpen]);
   useEffect(() => {
-    fetchStats();
-  }, [fetchStats]);
+    if (businessId) fetchStats();
+  }, [fetchStats, businessId]);
 
   // ── Helpers ───────────────────────────────────────────────────
   const getAptsForDay = (day: Date) =>
@@ -233,7 +163,7 @@ export default function DashboardPage() {
     setPanelOpen(false);
   };
 
-  const openAptPanel = (apt: Apt) => {
+  const openAptPanel = (apt: AppointmentWithRelations) => {
     setSelectedApt(apt);
     setPanelOpen(true);
   };
@@ -249,32 +179,36 @@ export default function DashboardPage() {
   const updateStatus = async (status: AppointmentStatus) => {
     if (!selectedApt) return;
     setUpdatingStatus(true);
-    await supabase
-      .from("appointments")
-      .update({ status })
-      .eq("id", selectedApt.id);
-    setUpdatingStatus(false);
-    setSelectedApt((prev) => (prev ? { ...prev, status } : null));
-    fetchMonthApts();
-    fetchDayApts();
-    fetchStats();
+    try {
+      await appointmentsRepo.updateAppointmentStatus(supabase, selectedApt.id, status);
+      setSelectedApt((prev) => (prev ? { ...prev, status } : null));
+      fetchMonthApts();
+      fetchDayApts();
+      fetchStats();
+    } catch (err) {
+      console.error('Error updating status:', err);
+    } finally {
+      setUpdatingStatus(false);
+    }
   };
 
   const deleteAppointment = async (id: string) => {
     setDeletingId(id);
-    await supabase
-      .from("appointments")
-      .update({ status: "cancelled" })
-      .eq("id", id);
-    setDeletingId(null);
-    setConfirmDelete(null);
-    if (selectedApt?.id === id) {
-      setPanelOpen(false);
-      setSelectedApt(null);
+    try {
+      await appointmentsRepo.cancelAppointment(supabase, id);
+      setConfirmDelete(null);
+      if (selectedApt?.id === id) {
+        setPanelOpen(false);
+        setSelectedApt(null);
+      }
+      fetchMonthApts();
+      fetchDayApts();
+      fetchStats();
+    } catch (err) {
+      console.error('Error deleting appointment:', err);
+    } finally {
+      setDeletingId(null);
     }
-    fetchMonthApts();
-    fetchDayApts();
-    fetchStats();
   };
 
   // ── Build calendar grid ───────────────────────────────────────
@@ -691,12 +625,12 @@ export default function DashboardPage() {
                                 key={apt.id}
                                 className="w-full rounded-md px-1.5 py-1 text-[10px] font-bold truncate leading-tight"
                                 style={{
-                                  background: `${STATUS_COLORS[apt.status] ?? "#3884FF"}28`,
-                                  color: STATUS_COLORS[apt.status] ?? "#63B3FF",
-                                  border: `1px solid ${STATUS_COLORS[apt.status] ?? "#3884FF"}50`,
+                                  background: `${STATUS_COLORS[apt.status ?? 'pending'] ?? "#3884FF"}28`,
+                                  color: STATUS_COLORS[apt.status ?? 'pending'] ?? "#63B3FF",
+                                  border: `1px solid ${STATUS_COLORS[apt.status ?? 'pending'] ?? "#3884FF"}50`,
                                   borderLeftWidth: "2px",
                                   borderLeftColor:
-                                    STATUS_COLORS[apt.status] ?? "#3884FF",
+                                    STATUS_COLORS[apt.status ?? 'pending'] ?? "#3884FF",
                                 }}
                               >
                                 {apt.client?.name?.split(" ")[0]}
@@ -992,8 +926,8 @@ export default function DashboardPage() {
                       className="rounded-2xl overflow-hidden transition-all duration-200"
                       style={{
                         background: "#141417",
-                        border: `1px solid ${STATUS_COLORS[apt.status] ?? "#262629"}40`,
-                        borderLeft: `3px solid ${STATUS_COLORS[apt.status] ?? "#0062FF"}`,
+                        border: `1px solid ${STATUS_COLORS[apt.status ?? 'pending'] ?? "#262629"}40`,
+                        borderLeft: `3px solid ${STATUS_COLORS[apt.status ?? 'pending'] ?? "#0062FF"}`,
                       }}
                     >
                       {/* Confirm delete overlay */}
@@ -1073,8 +1007,8 @@ export default function DashboardPage() {
                               <span
                                 className="text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0"
                                 style={{
-                                  background: `${STATUS_COLORS[apt.status]}22`,
-                                  color: STATUS_COLORS[apt.status],
+                                  background: `${STATUS_COLORS[apt.status ?? 'pending']}22`,
+                                  color: STATUS_COLORS[apt.status ?? 'pending'],
                                 }}
                               >
                                 {apt.status === "pending"
@@ -1193,7 +1127,7 @@ export default function DashboardPage() {
               className="flex items-center justify-between px-5 py-4 flex-shrink-0"
               style={{
                 borderBottom: "1px solid #262629",
-                borderTop: `3px solid ${STATUS_COLORS[selectedApt.status] ?? "#0062FF"}`,
+                borderTop: `3px solid ${STATUS_COLORS[selectedApt.status ?? ''] ?? "#0062FF"}`,
               }}
             >
               <div>
@@ -1225,9 +1159,9 @@ export default function DashboardPage() {
                 <span
                   className="badge"
                   style={{
-                    background: `${STATUS_COLORS[selectedApt.status]}20`,
-                    color: STATUS_COLORS[selectedApt.status],
-                    border: `1px solid ${STATUS_COLORS[selectedApt.status]}30`,
+                    background: `${STATUS_COLORS[selectedApt.status ?? ''] ?? "#0062FF"}20`,
+                    color: STATUS_COLORS[selectedApt.status ?? ''] ?? "#0062FF",
+                    border: `1px solid ${STATUS_COLORS[selectedApt.status ?? ''] ?? "#0062FF"}30`,
                   }}
                 >
                   {selectedApt.status === "pending"

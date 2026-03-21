@@ -54,7 +54,7 @@ export function slugify(str: string): string {
 }
 
 // ── Status Helpers ────────────────────────────────────────
-import type { AppointmentStatus } from '@/types'
+import type { AppointmentStatus, PaymentMethod, ExpenseCategory } from '@/types'
 
 export const appointmentStatusConfig: Record<
   AppointmentStatus,
@@ -92,7 +92,7 @@ export const appointmentStatusConfig: Record<
   },
 }
 
-export const paymentMethodLabels: Record<string, string> = {
+export const paymentMethodLabels: Record<PaymentMethod, string> = {
   cash:     'Efectivo',
   card:     'Tarjeta',
   transfer: 'Transferencia',
@@ -100,7 +100,7 @@ export const paymentMethodLabels: Record<string, string> = {
   other:    'Otro',
 }
 
-export const expenseCategoryLabels: Record<string, string> = {
+export const expenseCategoryLabels: Record<ExpenseCategory, string> = {
   supplies:  'Insumos',
   rent:      'Arriendo',
   utilities: 'Servicios',

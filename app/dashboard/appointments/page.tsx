@@ -1,43 +1,36 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { CalendarDays, Plus, ChevronLeft, ChevronRight, Search, Clock, Loader2 } from 'lucide-react'
+import {
+  CalendarDays, Plus, ChevronLeft, ChevronRight,
+  Search, Clock, Loader2, CheckCircle2, XCircle, AlertCircle,
+} from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { AppointmentStatusBadge, DualBookingBadge } from '@/components/ui/badge'
-import { formatTime, formatCurrency } from '@/lib/utils'
-import { createClient } from '@/lib/supabase/client'
-import type { Appointment } from '@/types'
+import { useBusinessContext } from '@/lib/hooks/use-business-context'
+import * as appointmentsRepo from '@/lib/repositories/appointments.repo'
+import { isExpiredAppointment } from '@/lib/use-cases/appointments.use-case'
+import { formatDate, formatTime, formatCurrency, appointmentStatusConfig } from '@/lib/utils'
+import type { AppointmentWithRelations, AppointmentStatus } from '@/types'
 import { format } from 'date-fns'
 
 export default function AppointmentsPage() {
-  const [businessId, setBusinessId] = useState<string | null>(null)
-  const [appointments, setAppointments] = useState<Appointment[]>([])
-  const [loading, setLoading] = useState(true)
-  const [view, setView] = useState<'day' | 'week'>('day')
-  const [date, setDate] = useState(new Date())
-  const [query, setQuery] = useState('')
-  const supabase = createClient()
-
-  useEffect(() => {
-    async function init() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      const { data: dbUser } = await supabase
-        .from('users').select('business_id').eq('id', user.id).single()
-      if (dbUser?.business_id) setBusinessId(dbUser.business_id)
-      else setLoading(false)
-    }
-    init()
-  }, [])
+  const { supabase, businessId, loading: contextLoading } = useBusinessContext()
+  const [appointments,  setAppointments]  = useState<AppointmentWithRelations[]>([])
+  const [loading,       setLoading]       = useState(true)
+  const [resolvingId,   setResolvingId]   = useState<string | null>(null)
+  const [view,          setView]          = useState<'day' | 'week'>('day')
+  const [date,          setDate]          = useState(new Date())
+  const [query,         setQuery]         = useState('')
 
   const fetchAppointments = useCallback(async () => {
     if (!businessId) return
     setLoading(true)
-    const dateStr = format(date, 'yyyy-MM-dd')
+    const dateStr    = format(date, 'yyyy-MM-dd')
     const startOfDay = new Date(`${dateStr}T00:00:00`).toISOString()
-    const endOfDay = new Date(`${dateStr}T23:59:59.999`).toISOString()
+    const endOfDay   = new Date(`${dateStr}T23:59:59.999`).toISOString()
 
     const { data, error } = await supabase
       .from('appointments')
@@ -52,28 +45,46 @@ export default function AppointmentsPage() {
       .lt('start_at', endOfDay)
       .order('start_at', { ascending: true })
 
-    if (!error && data) setAppointments(data as Appointment[])
+    if (!error && data) setAppointments(data as AppointmentWithRelations[])
     setLoading(false)
-  }, [businessId, date])
+  }, [businessId, date, supabase])
 
-  useEffect(() => { fetchAppointments() }, [fetchAppointments])
+  useEffect(() => {
+    if (!contextLoading) {
+      fetchAppointments()
+    }
+  }, [fetchAppointments, contextLoading])
 
-  if (loading && !businessId) {
-    return <div className="flex items-center justify-center min-h-[400px]"><Loader2 className="animate-spin" /></div>
+  // ── Resolve expired appointment ────────────────────────────────────────
+  const handleResolve = async (
+    aptId: string,
+    resolution: 'completed' | 'no_show'
+  ) => {
+    setResolvingId(aptId)
+    await supabase
+      .from('appointments')
+      .update({
+        status:     resolution,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', aptId)
+    setAppointments(prev =>
+      prev.map(a => a.id === aptId ? { ...a, status: resolution } : a)
+    )
+    setResolvingId(null)
   }
 
-  if (!businessId) {
+  if (loading && contextLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <p className="text-muted-foreground">No autorizado. Por favor inicia sesión.</p>
+        <Loader2 className="animate-spin" style={{ color: '#0062FF' }} />
       </div>
     )
   }
 
-  const filteredApts = appointments.filter(
-    (a) =>
-      (a.client as any)?.name?.toLowerCase().includes(query.toLowerCase()) ||
-      (a.service as any)?.name?.toLowerCase().includes(query.toLowerCase())
+  const filteredApts = appointments.filter(a =>
+    a.client?.name?.toLowerCase().includes(query.toLowerCase()) ||
+    a.service?.name?.toLowerCase().includes(query.toLowerCase())
   )
 
   const handlePrevDay = () => setDate(d => { const n = new Date(d); n.setDate(n.getDate() - 1); return n })
@@ -92,7 +103,6 @@ export default function AppointmentsPage() {
       </div>
 
       <div className="flex flex-col gap-3 bg-surface p-2 rounded-2xl border border-border">
-        {/* Date navigator */}
         <div className="flex items-center gap-1">
           <button onClick={handlePrevDay} className="btn-ghost p-2 rounded-xl flex-shrink-0">
             <ChevronLeft size={18} />
@@ -104,21 +114,20 @@ export default function AppointmentsPage() {
             <ChevronRight size={18} />
           </button>
         </div>
-        {/* Search + view toggle */}
         <div className="flex items-center gap-2">
           <div className="relative flex-1">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <input
-              type="text" placeholder="Buscar cita..."
-              value={query} onChange={(e) => setQuery(e.target.value)}
-              className="input-base pl-9 h-9 text-sm w-full"
-            />
+            <input type="text" placeholder="Buscar cita..."
+              value={query} onChange={e => setQuery(e.target.value)}
+              className="input-base pl-9 h-9 text-sm w-full" />
           </div>
           <div className="flex bg-muted p-1 rounded-xl flex-shrink-0">
             {(['day', 'week'] as const).map(v => (
               <button key={v} onClick={() => setView(v)}
                 className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
-                  view === v ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                  view === v
+                    ? 'bg-card text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
                 }`}>
                 {v === 'day' ? 'Día' : 'Semana'}
               </button>
@@ -130,7 +139,7 @@ export default function AppointmentsPage() {
       <Card className="p-0 overflow-hidden min-h-[400px]">
         {loading ? (
           <div className="flex flex-col justify-center items-center h-[400px] text-muted-foreground">
-            <Loader2 size={32} className="animate-spin mb-4" />
+            <Loader2 size={32} className="animate-spin mb-4" style={{ color: '#0062FF' }} />
             <p>Cargando agenda...</p>
           </div>
         ) : filteredApts.length === 0 ? (
@@ -144,37 +153,95 @@ export default function AppointmentsPage() {
           </div>
         ) : (
           <div className="divide-y divide-border">
-            {filteredApts.map((apt) => (
-              <div key={apt.id} className="flex items-start sm:items-center gap-4 p-4 hover:bg-surface transition-colors group">
-                <div className="text-center w-14 flex-shrink-0 pt-1 sm:pt-0">
-                  <p className="text-sm font-bold text-foreground">{formatTime(apt.start_at)}</p>
-                  <p className="text-xs text-muted-foreground">{formatTime(apt.end_at)}</p>
-                </div>
-                <div className="w-1 h-12 sm:h-10 rounded-full flex-shrink-0"
-                  style={{ backgroundColor: (apt.service as any)?.color ?? '#ccc' }} />
-                <div className="flex-1 min-w-0">
-                  <div className="flex flex-wrap items-center gap-2 mb-0.5">
-                    <p className="text-sm font-semibold text-foreground group-hover:text-brand-600 transition-colors">
-                      {(apt.client as any)?.name ?? 'Cliente desconocido'}
-                    </p>
-                    {apt.is_dual_booking && <DualBookingBadge />}
+            {filteredApts.map(apt => {
+              const expired = isExpiredAppointment({
+                end_at: apt.end_at,
+                status: apt.status ?? 'pending',
+              })
+
+              return (
+                <div key={apt.id}>
+                  {/* Main appointment row */}
+                  <div className={`flex items-start sm:items-center gap-4 p-4 transition-colors group ${
+                    expired ? 'bg-yellow-500/5' : 'hover:bg-surface'
+                  }`}>
+                    <div className="text-center w-14 flex-shrink-0 pt-1 sm:pt-0">
+                      <p className="text-sm font-bold text-foreground">{formatTime(apt.start_at)}</p>
+                      <p className="text-xs text-muted-foreground">{formatTime(apt.end_at)}</p>
+                    </div>
+                    <div className="w-1 h-12 sm:h-10 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: apt.service?.color ?? '#ccc' }} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-2 mb-0.5">
+                        <p className="text-sm font-semibold text-foreground group-hover:text-brand-600 transition-colors">
+                          {apt.client?.name ?? 'Cliente desconocido'}
+                        </p>
+                        {apt.is_dual_booking && <DualBookingBadge />}
+                        {/* Expired indicator */}
+                        {expired && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full"
+                            style={{ background: 'rgba(255,214,10,0.12)', color: '#FFD60A', border: '1px solid rgba(255,214,10,0.25)' }}>
+                            <AlertCircle size={10} /> Sin gestionar
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground flex items-center gap-2 flex-wrap">
+                        <span>{apt.service?.name} ({apt.service?.duration_min} min)</span>
+                        <span className="hidden sm:inline">·</span>
+                        <span className="flex items-center gap-1">
+                          <Clock size={11} /> {apt.assigned_user?.name ?? 'Sin asignar'}
+                        </span>
+                      </p>
+                    </div>
+                    <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                      <AppointmentStatusBadge status={(apt.status ?? 'pending') as AppointmentStatus} />
+                      <p className="text-xs font-semibold text-foreground">
+                        {formatCurrency(apt.service?.price ?? 0)}
+                      </p>
+                      <Link href={`/dashboard/appointments/${apt.id}/edit`}
+                        className="text-[11px] font-medium hover:underline"
+                        style={{ color: '#3884FF' }}>
+                        Editar
+                      </Link>
+                    </div>
                   </div>
-                  <p className="text-xs text-muted-foreground flex items-center gap-2 flex-wrap">
-                    <span>{(apt.service as any)?.name} ({(apt.service as any)?.duration_min} min)</span>
-                    <span className="hidden sm:inline">·</span>
-                    <span className="flex items-center gap-1">
-                      <Clock size={11} /> {(apt.assigned_user as any)?.name ?? 'Sin asignar'}
-                    </span>
-                  </p>
+
+                  {/* Expired resolution bar */}
+                  {expired && (
+                    <div className="flex items-center gap-3 px-4 py-3 flex-wrap"
+                      style={{ background: 'rgba(255,214,10,0.06)', borderTop: '1px solid rgba(255,214,10,0.15)' }}>
+                      <p className="text-xs font-medium flex-1" style={{ color: '#FFD60A' }}>
+                        Esta cita ya pasó. ¿Fue atendido el cliente?
+                      </p>
+                      <div className="flex gap-2 flex-shrink-0">
+                        <button
+                          onClick={() => handleResolve(apt.id, 'completed')}
+                          disabled={resolvingId === apt.id}
+                          className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl transition-all disabled:opacity-50"
+                          style={{ background: 'rgba(48,209,88,0.12)', color: '#30D158', border: '1px solid rgba(48,209,88,0.25)' }}>
+                          {resolvingId === apt.id
+                            ? <Loader2 size={12} className="animate-spin" />
+                            : <CheckCircle2 size={13} />
+                          }
+                          Sí, fue atendido
+                        </button>
+                        <button
+                          onClick={() => handleResolve(apt.id, 'no_show')}
+                          disabled={resolvingId === apt.id}
+                          className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl transition-all disabled:opacity-50"
+                          style={{ background: 'rgba(255,59,48,0.08)', color: '#FF3B30', border: '1px solid rgba(255,59,48,0.2)' }}>
+                          {resolvingId === apt.id
+                            ? <Loader2 size={12} className="animate-spin" />
+                            : <XCircle size={13} />
+                          }
+                          No se presentó
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <div className="flex flex-col items-end gap-2 flex-shrink-0">
-                  <AppointmentStatusBadge status={(apt.status ?? 'pending') as any} />
-                  <p className="text-xs font-semibold text-foreground">
-                    {formatCurrency((apt.service as any)?.price ?? 0)}
-                  </p>
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </Card>

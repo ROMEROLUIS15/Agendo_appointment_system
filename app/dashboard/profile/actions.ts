@@ -1,41 +1,72 @@
 'use server'
 
+import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import * as usersRepo from '@/lib/repositories/users.repo'
 
-export async function updateProfile(formData: FormData) {
+// ── Zod schemas ───────────────────────────────────────────────────────────
+const UpdateProfileSchema = z.object({
+  name:  z.string().min(1, 'El nombre es obligatorio').max(100),
+  phone: z.string().max(20).optional().or(z.literal('')),
+  email: z.string().email('Email inválido').optional(),
+})
+
+const ChangePasswordSchema = z.object({
+  password:        z.string().min(6, 'La contraseña debe tener al menos 6 caracteres'),
+  confirmPassword: z.string(),
+}).refine(d => d.password === d.confirmPassword, {
+  message: 'Las contraseñas no coinciden.',
+  path: ['confirmPassword'],
+})
+
+// ── Action result type ────────────────────────────────────────────────────
+interface ProfileResult {
+  error?: string
+  success?: string
+}
+
+export async function updateProfile(formData: FormData): Promise<ProfileResult> {
   const supabase = await createClient()
 
+  // 1. Auth guard
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'No autenticado' }
 
-  const name            = formData.get('name') as string
-  const phone           = formData.get('phone') as string
-  const email           = formData.get('email') as string
-  const password        = (formData.get('password') as string)?.trim()
-  const confirmPassword = (formData.get('confirmPassword') as string)?.trim()
+  // 2. Validate profile fields
+  const profileParsed = UpdateProfileSchema.safeParse({
+    name:  formData.get('name'),
+    phone: formData.get('phone'),
+    email: formData.get('email'),
+  })
 
-  // 1. Validar contraseña solo si el usuario quiere cambiarla
-  if (password) {
-    if (password.length < 6) {
-      return { error: 'La contraseña debe tener al menos 6 caracteres.' }
-    }
-    if (password !== confirmPassword) {
-      return { error: 'Las contraseñas no coinciden.' }
+  if (!profileParsed.success) {
+    return { error: profileParsed.error.errors[0]?.message ?? 'Datos inválidos' }
+  }
+
+  const { name, phone, email } = profileParsed.data
+
+  // 3. Validate password only if provided
+  const rawPassword        = (formData.get('password') as string | null)?.trim() ?? ''
+  const rawConfirmPassword = (formData.get('confirmPassword') as string | null)?.trim() ?? ''
+
+  if (rawPassword) {
+    const pwParsed = ChangePasswordSchema.safeParse({
+      password:        rawPassword,
+      confirmPassword: rawConfirmPassword,
+    })
+
+    if (!pwParsed.success) {
+      return { error: pwParsed.error.errors[0]?.message ?? 'Error en la contraseña' }
     }
   }
 
-  // 2. Actualizar tabla users
-  const { error: userError } = await supabase
-    .from('users')
-    .update({ name, phone })
-    .eq('id', user.id)
+  // 4. Update user table via repo
+  await usersRepo.updateUser(supabase, user.id, { name, phone: phone || null })
 
-  if (userError) return { error: userError.message }
-
-  // 3. Cambiar contraseña SOLO si se proporcionó
-  if (password) {
-    const { error: pwError } = await supabase.auth.updateUser({ password })
+  // 5. Change password (auth infra — stays in action)
+  if (rawPassword) {
+    const { error: pwError } = await supabase.auth.updateUser({ password: rawPassword })
     if (pwError) {
       if (pwError.message.toLowerCase().includes('different from the old password')) {
         return { error: 'La nueva contraseña debe ser diferente a la actual.' }
@@ -44,7 +75,7 @@ export async function updateProfile(formData: FormData) {
     }
   }
 
-  // 4. Cambiar email SOLO si cambió
+  // 6. Change email (auth infra — stays in action)
   if (email && email !== user.email) {
     const { error: emailError } = await supabase.auth.updateUser({ email })
     if (emailError) return { error: 'Error al cambiar email: ' + emailError.message }
@@ -56,12 +87,16 @@ export async function updateProfile(formData: FormData) {
   return { success: 'Perfil actualizado correctamente.' }
 }
 
-export async function updateAvatar(url: string) {
+export async function updateAvatar(url: string): Promise<ProfileResult> {
   const supabase = await createClient()
+
+  // Auth guard
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'No autenticado' }
-  const { error } = await supabase.from('users').update({ avatar_url: url }).eq('id', user.id)
-  if (error) return { error: error.message }
+
+  // Update avatar via repo
+  await usersRepo.updateUser(supabase, user.id, { avatar_url: url })
+
   revalidatePath('/dashboard/profile')
   return { success: 'Imagen actualizada' }
 }

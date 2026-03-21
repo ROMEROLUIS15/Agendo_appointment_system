@@ -5,13 +5,22 @@ import Image from 'next/image'
 import { User, Mail, Camera, Save, AlertCircle, CheckCircle2, Trash2, Lock } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { createClient } from '@/lib/supabase/client'
+import { useBusinessContext } from '@/lib/hooks/use-business-context'
 import { updateProfile } from './actions'
 import { PasswordInput } from '@/components/ui/password-input'
 import { PhoneInputFlags, parsePhone, type Country, COUNTRIES } from '@/components/ui/phone-input-flags'
 
+interface ProfileUser {
+  id: string
+  name: string | null
+  email: string | null
+  phone: string | null
+  avatar_url: string | null
+}
+
 export default function ProfilePage() {
-  const [user,           setUser]           = useState<any>(null)
+  const { supabase } = useBusinessContext()
+  const [user,           setUser]           = useState<ProfileUser | null>(null)
   const [loading,        setLoading]        = useState(true)
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
   const [avatarUrl,      setAvatarUrl]      = useState<string | null>(null)
@@ -23,25 +32,25 @@ export default function ProfilePage() {
   const [localPhone,     setLocalPhone]     = useState('')
 
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const supabase     = createClient()
 
   useEffect(() => {
     async function loadUser() {
       const { data: { user: authUser } } = await supabase.auth.getUser()
       if (authUser) {
         const { data: dbUser } = await supabase
-          .from('users').select('*').eq('id', authUser.id).single()
-        setUser({ ...authUser, ...dbUser })
-        setAvatarUrl(dbUser?.avatar_url ?? null)
-        const parsed = parsePhone(dbUser?.phone)
-        setPhoneCountry(parsed.country)
-        setLocalPhone(parsed.local)
+          .from('users').select('id, name, email, phone, avatar_url').eq('id', authUser.id).single()
+        if (dbUser) {
+          setUser({ ...dbUser, email: authUser.email ?? dbUser.email })
+          setAvatarUrl(dbUser.avatar_url ?? null)
+          const parsed = parsePhone(dbUser.phone)
+          setPhoneCountry(parsed.country)
+          setLocalPhone(parsed.local)
+        }
       }
       setLoading(false)
     }
     loadUser()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [supabase])
 
   const showMsg = (type: 'error' | 'success', text: string) => {
     if (type === 'error') { setError(text); setSuccess(null) }
@@ -218,7 +227,7 @@ export default function ProfilePage() {
                 <div className="relative">
                   <User size={16} className="absolute left-3 top-1/2 -translate-y-1/2"
                     style={{ color: '#909098' }} />
-                  <input name="name" defaultValue={user?.name} className="input-base pl-10"
+                  <input name="name" defaultValue={user?.name ?? ''} className="input-base pl-10"
                     placeholder="Tu nombre" required />
                 </div>
               </div>
@@ -247,7 +256,7 @@ export default function ProfilePage() {
               <div className="relative">
                 <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2"
                   style={{ color: '#909098' }} />
-                <input name="email" defaultValue={user?.email} className="input-base pl-10"
+                <input name="email" defaultValue={user?.email ?? ''} className="input-base pl-10"
                   placeholder="tu@email.com" required />
               </div>
               <p className="text-[10px] ml-1 italic" style={{ color: '#6A6A72' }}>

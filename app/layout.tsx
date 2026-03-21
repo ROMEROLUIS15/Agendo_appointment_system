@@ -3,7 +3,7 @@ import './globals.css'
 
 // ── Viewport separado (Next.js 14+ best practice) ────────────────────────────
 export const viewport: Viewport = {
-  themeColor: '#08080A',
+  themeColor: '#0062FF',
   width: 'device-width',
   initialScale: 1,
   /*
@@ -20,9 +20,15 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   title: { default: 'Cronix', template: '%s – Cronix' },
   description: 'Plataforma inteligente para gestionar citas, clientes y finanzas.',
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'Cronix',
+  },
   icons: {
     icon: '/favicon.ico',
-    apple: '/web-app-manifest-192x192.png',
+    apple: '/icon-192x192.png',
   },
 }
 

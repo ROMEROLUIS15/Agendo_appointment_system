@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useCallback, useEffect } from "react";
 import {
   Plus,
   Pencil,
@@ -16,18 +16,10 @@ import {
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { createClient } from "@/lib/supabase/client";
+import { useBusinessContext } from "@/lib/hooks/use-business-context";
+import * as servicesRepo from "@/lib/repositories/services.repo";
+import type { Service } from "@/types";
 
-interface Service {
-  id: string;
-  name: string;
-  description: string | null;
-  duration_min: number;
-  price: number;
-  color: string | null;
-  category: string | null;
-  is_active: boolean | null;
-}
 interface ServiceForm {
   name: string;
   description: string;
@@ -70,8 +62,7 @@ const emptyForm = (): ServiceForm => ({
 });
 
 export default function ServicesPage() {
-  const supabase = createClient();
-  const [businessId, setBusinessId] = useState<string | null>(null);
+  const { supabase, businessId, loading: contextLoading } = useBusinessContext();
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -85,37 +76,22 @@ export default function ServicesPage() {
     text: string;
   } | null>(null);
 
-  useEffect(() => {
-    async function init() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
-      const { data: dbUser } = await supabase
-        .from("users")
-        .select("business_id")
-        .eq("id", user.id)
-        .single();
-      if (!dbUser?.business_id) {
-        setLoading(false);
-        return;
-      }
-      setBusinessId(dbUser.business_id);
-      await loadServices(dbUser.business_id);
+  const loadServices = useCallback(async (bId: string) => {
+    try {
+      const data = await servicesRepo.getServices(supabase, bId);
+      setServices(data);
+    } catch (err) {
+      console.error('Error loading services:', err);
+    } finally {
+      setLoading(false);
     }
-    init();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [supabase]);
 
-  const loadServices = async (bId: string) => {
-    const { data } = await supabase
-      .from("services")
-      .select("*")
-      .eq("business_id", bId)
-      .order("name");
-    setServices((data as Service[]) ?? []);
-    setLoading(false);
-  };
+  // Load services when business context is ready
+  useEffect(() => {
+    if (businessId) loadServices(businessId);
+    else if (!contextLoading) setLoading(false);
+  }, [businessId, contextLoading, loadServices]);
 
   const showMsg = (type: "success" | "error", text: string) => {
     setMsg({ type, text });
@@ -158,49 +134,47 @@ export default function ServicesPage() {
       category: form.category || null,
       is_active: form.is_active,
     };
-    let error;
-    if (editingId) {
-      ({ error } = await supabase
-        .from("services")
-        .update(payload)
-        .eq("id", editingId)
-        .eq("business_id", businessId));
-    } else {
-      ({ error } = await supabase
-        .from("services")
-        .insert({ ...payload, business_id: businessId }));
+    try {
+      if (editingId) {
+        await servicesRepo.updateService(supabase, editingId, businessId, payload);
+      } else {
+        await servicesRepo.createService(supabase, businessId, payload);
+      }
+      showMsg(
+        "success",
+        editingId ? "Servicio actualizado" : "Servicio creado correctamente",
+      );
+      setShowForm(false);
+      await loadServices(businessId);
+    } catch (err) {
+      showMsg("error", "Error al guardar: " + (err instanceof Error ? err.message : 'Error desconocido'));
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
-    if (error) return showMsg("error", "Error al guardar: " + error.message);
-    showMsg(
-      "success",
-      editingId ? "Servicio actualizado" : "Servicio creado correctamente",
-    );
-    setShowForm(false);
-    await loadServices(businessId);
   };
 
   const handleDelete = async (id: string) => {
     if (!businessId) return;
     setDeletingId(id);
-    const { error } = await supabase
-      .from("services")
-      .delete()
-      .eq("id", id)
-      .eq("business_id", businessId);
-    setDeletingId(null);
-    if (error) return showMsg("error", "Error al eliminar: " + error.message);
-    showMsg("success", "Servicio eliminado");
-    await loadServices(businessId);
+    try {
+      await servicesRepo.deleteService(supabase, id, businessId);
+      showMsg("success", "Servicio eliminado");
+      await loadServices(businessId);
+    } catch (err) {
+      showMsg("error", "Error al eliminar: " + (err instanceof Error ? err.message : 'Error desconocido'));
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   const toggleActive = async (s: Service) => {
     if (!businessId) return;
-    await supabase
-      .from("services")
-      .update({ is_active: !s.is_active })
-      .eq("id", s.id);
-    await loadServices(businessId);
+    try {
+      await servicesRepo.toggleServiceActive(supabase, s.id, s.is_active ?? true);
+      await loadServices(businessId);
+    } catch (err) {
+      showMsg("error", "Error al cambiar estado: " + (err instanceof Error ? err.message : 'Error desconocido'));
+    }
   };
 
   if (loading)

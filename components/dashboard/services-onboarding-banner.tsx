@@ -1,38 +1,32 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
 import { Wrench, X, ArrowRight, Sparkles } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
 
-export function ServicesOnboardingBanner({ businessId }: { businessId: string }) {
-  const [show, setShow] = useState(false)
-  const supabase = createClient()
+interface Props {
+  businessId: string
+  hasServices?: boolean
+}
 
-  useEffect(() => {
-    if (!businessId) return
-    // Solo mostrar si no han cerrado el banner antes
-    const dismissed = localStorage.getItem(`services-banner-${businessId}`)
-    if (dismissed) return
+/**
+ * Banner shown when a business has no services configured.
+ * Now receives `hasServices` as prop — no Supabase import needed.
+ * Falls back to showing the banner if `hasServices` is undefined (backward compat).
+ */
+export function ServicesOnboardingBanner({ businessId, hasServices }: Props) {
+  const [dismissed, setDismissed] = useState(() => {
+    if (typeof window === 'undefined') return true
+    return !!localStorage.getItem(`services-banner-${businessId}`)
+  })
 
-    async function checkServices() {
-      const { count } = await supabase
-        .from('services')
-        .select('id', { count: 'exact', head: true })
-        .eq('business_id', businessId)
-        .eq('is_active', true)
-      if ((count ?? 0) === 0) setShow(true)
-    }
-    checkServices()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [businessId])
+  // If parent tells us there ARE services, don't show
+  if (hasServices || dismissed) return null
 
   const dismiss = () => {
     localStorage.setItem(`services-banner-${businessId}`, '1')
-    setShow(false)
+    setDismissed(true)
   }
-
-  if (!show) return null
 
   return (
     <div className="relative overflow-hidden rounded-2xl border border-brand-200 bg-gradient-to-r from-brand-50 to-indigo-50 dark:from-brand-900/20 dark:to-indigo-900/20 dark:border-brand-800/30 p-5">

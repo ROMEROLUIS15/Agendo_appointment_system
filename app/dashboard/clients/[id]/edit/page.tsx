@@ -9,7 +9,8 @@ import {
 import Link from 'next/link'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { createClient } from '@/lib/supabase/client'
+import { useBusinessContext } from '@/lib/hooks/use-business-context'
+import * as clientsRepo from '@/lib/repositories/clients.repo'
 import { PhoneInputFlags, parsePhone, COUNTRIES, Country } from '@/components/ui/phone-input-flags'
 
 const TAG_OPTIONS = ['VIP', 'Frecuente', 'Nuevo']
@@ -19,13 +20,12 @@ interface Props { params: { id: string } }
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function ClientEditPage({ params }: Props) {
   const router   = useRouter()
-  const supabase = createClient()
+  const { supabase, businessId, loading: contextLoading } = useBusinessContext()
 
   const [loading,        setLoading]        = useState(true)
   const [saving,         setSaving]         = useState(false)
   const [deleting,       setDeleting]       = useState(false)
   const [confirmDelete,  setConfirmDelete]  = useState(false)
-  const [businessId,     setBusinessId]     = useState<string | null>(null)
   const [msg,            setMsg]            = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   const [form, setForm] = useState({
@@ -40,28 +40,15 @@ export default function ClientEditPage({ params }: Props) {
   const [selectedCountry, setSelectedCountry] = useState<Country>(COUNTRIES[0] as Country)
 
   useEffect(() => {
+    if (!businessId) {
+      if (!contextLoading) router.push('/dashboard/setup')
+      return
+    }
     async function load() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return router.push('/login')
+      const client = await clientsRepo.getClientById(supabase, params.id, businessId!)
+      if (!client) return router.push('/dashboard/clients')
 
-      const { data: dbUser } = await supabase
-        .from('users').select('business_id').eq('id', user.id).single()
-      if (!dbUser?.business_id) return router.push('/dashboard/setup')
-
-      setBusinessId(dbUser.business_id)
-
-      const { data: client, error } = await supabase
-        .from('clients')
-        .select('*')
-        .eq('id', params.id)
-        .eq('business_id', dbUser.business_id)
-        .single()
-
-      if (error || !client) return router.push('/dashboard/clients')
-
-      // Parsear teléfono guardado
       const { country, local } = parsePhone(client.phone ?? '')
-
       setSelectedCountry(country)
       setForm({
         name:       client.name      ?? '',
@@ -74,7 +61,7 @@ export default function ClientEditPage({ params }: Props) {
       setLoading(false)
     }
     load()
-  }, [])
+  }, [supabase, businessId, contextLoading, params.id, router])
 
   const showMsg = (type: 'success' | 'error', text: string) => {
     setMsg({ type, text })

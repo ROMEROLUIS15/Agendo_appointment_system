@@ -88,3 +88,17 @@ export interface DashboardStats {
   pendingAppointments: number
   completedToday: number
 }
+
+// ── Query Response Types (Supabase JOINs) ───────────────────
+export type {
+  AppointmentWithRelations,
+  AppointmentClient,
+  AppointmentService,
+  AppointmentAssignedUser,
+  ClientAppointmentWithDetails,
+  TransactionSummary,
+  ExpenseRow,
+  TransactionRow,
+  SlotCheckAppointment,
+  BusinessSettingsJson,
+} from './query-types'

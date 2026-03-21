@@ -4,13 +4,16 @@ import { useState, useEffect } from 'react'
 import { BarChart3, TrendingUp, Download, Users, Calendar, DollarSign, Star } from 'lucide-react'
 import { Card, StatCard } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { createClient } from '@/lib/supabase/client'
+import { useBusinessContext } from '@/lib/hooks/use-business-context'
+import * as financesRepo from '@/lib/repositories/finances.repo'
 import { formatCurrency, formatDate } from '@/lib/utils'
-import type { Database } from '@/types/database.types'
 
-type AppointmentRow = Database['public']['Tables']['appointments']['Row'] & {
-  service?: { name: string; price: number } | null
-  client?:  { name: string } | null
+interface ReportAppointment {
+  id: string
+  start_at: string
+  status: string | null
+  service: { name: string; price: number } | null
+  client: { name: string } | null
 }
 
 interface ReportData {
@@ -22,7 +25,7 @@ interface ReportData {
   totalExpenses:         number
   netProfit:             number
   byService:             Record<string, { count: number; revenue: number }>
-  recentAppointments:    AppointmentRow[]
+  recentAppointments:    ReportAppointment[]
 }
 
 // ── Status color map ──────────────────────────────────────────────────────────
@@ -35,80 +38,75 @@ const STATUS_STYLES = {
 } as const
 
 export default function ReportsPage() {
-  const supabase = createClient()
+  const { supabase, businessId, loading: contextLoading } = useBusinessContext()
   const [data,         setData]         = useState<ReportData | null>(null)
   const [loading,      setLoading]      = useState(true)
   const [activeReport, setActiveReport] = useState<string | null>(null)
 
   useEffect(() => {
+    if (!businessId) {
+      if (!contextLoading) setLoading(false)
+      return
+    }
+
     async function loadData() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+      try {
+        const now        = new Date()
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+        const monthEnd   = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString()
 
-      const { data: dbUser } = await supabase
-        .from('users').select('business_id').eq('id', user.id).single()
-      if (!dbUser?.business_id) { setLoading(false); return }
+        // Parallel queries via repos + direct supabase for complex JOINs
+        const [aptsRes, clientsRes, txns, expenses] = await Promise.all([
+          supabase
+            .from('appointments')
+            .select('id, start_at, status, service:services(name, price), client:clients(name)')
+            .eq('business_id', businessId!)
+            .gte('start_at', monthStart)
+            .lte('start_at', monthEnd)
+            .order('start_at', { ascending: false }),
+          supabase
+            .from('clients')
+            .select('id', { count: 'exact' })
+            .eq('business_id', businessId!)
+            .is('deleted_at', null),
+          financesRepo.getTransactions(supabase, businessId!),
+          financesRepo.getExpenses(supabase, businessId!),
+        ])
 
-      const bId = dbUser.business_id
-      const now        = new Date()
-      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
-      const monthEnd   = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString()
+        const apts = (aptsRes.data ?? []) as ReportAppointment[]
+        const monthTxns = txns.filter(t => (t.paid_at ?? '') >= monthStart && (t.paid_at ?? '') <= monthEnd)
+        const monthExps = expenses.filter(e => (e.expense_date ?? '') >= (monthStart.split('T')[0] ?? '') && (e.expense_date ?? '') <= (monthEnd.split('T')[0] ?? ''))
 
-      const [aptsRes, clientsRes, txnsRes, expensesRes] = await Promise.all([
-        supabase
-          .from('appointments')
-          .select('*, service:services(name, price), client:clients(name)')
-          .eq('business_id', bId)
-          .gte('start_at', monthStart)
-          .lte('start_at', monthEnd)
-          .order('start_at', { ascending: false }),
-        supabase
-          .from('clients')
-          .select('id', { count: 'exact' })
-          .eq('business_id', bId)
-          .is('deleted_at', null),
-        supabase
-          .from('transactions')
-          .select('net_amount, amount')
-          .eq('business_id', bId)
-          .gte('paid_at', monthStart)
-          .lte('paid_at', monthEnd),
-        supabase
-          .from('expenses')
-          .select('amount')
-          .eq('business_id', bId)
-          .gte('expense_date', monthStart.split('T')[0])
-          .lte('expense_date', monthEnd.split('T')[0]),
-      ])
+        const totalRevenue  = monthTxns.reduce((s, t) => s + (t.net_amount ?? 0), 0)
+        const totalExpenses = monthExps.reduce((s, e) => s + e.amount, 0)
 
-      const apts          = (aptsRes.data ?? []) as AppointmentRow[]
-      const totalRevenue  = (txnsRes.data ?? []).reduce((s, t) => s + (t.net_amount ?? 0), 0)
-      const totalExpenses = (expensesRes.data ?? []).reduce((s, e) => s + e.amount, 0)
+        const byService: Record<string, { count: number; revenue: number }> = {}
+        apts.forEach(apt => {
+          const name = apt.service?.name ?? 'Sin servicio'
+          if (!byService[name]) byService[name] = { count: 0, revenue: 0 }
+          byService[name].count++
+          if (apt.status === 'completed') byService[name].revenue += apt.service?.price ?? 0
+        })
 
-      const byService: Record<string, { count: number; revenue: number }> = {}
-      apts.forEach(apt => {
-        const name = apt.service?.name ?? 'Sin servicio'
-        if (!byService[name]) byService[name] = { count: 0, revenue: 0 }
-        byService[name].count++
-        if (apt.status === 'completed') byService[name].revenue += apt.service?.price ?? 0
-      })
-
-      setData({
-        totalAppointments:     apts.length,
-        completedAppointments: apts.filter(a => a.status === 'completed').length,
-        cancelledAppointments: apts.filter(a => a.status === 'cancelled').length,
-        totalClients:          clientsRes.count ?? 0,
-        totalRevenue,
-        totalExpenses,
-        netProfit:             totalRevenue - totalExpenses,
-        byService,
-        recentAppointments:    apts.slice(0, 10),
-      })
-      setLoading(false)
+        setData({
+          totalAppointments:     apts.length,
+          completedAppointments: apts.filter(a => a.status === 'completed').length,
+          cancelledAppointments: apts.filter(a => a.status === 'cancelled').length,
+          totalClients:          clientsRes.count ?? 0,
+          totalRevenue,
+          totalExpenses,
+          netProfit:             totalRevenue - totalExpenses,
+          byService,
+          recentAppointments:    apts.slice(0, 10),
+        })
+      } catch (err) {
+        console.error('Error loading report data:', err)
+      } finally {
+        setLoading(false)
+      }
     }
     loadData()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [supabase, businessId, contextLoading])
 
   const handleDownloadReport = () => {
     if (!data) return
