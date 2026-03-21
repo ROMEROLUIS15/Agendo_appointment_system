@@ -22,15 +22,15 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
 
   // ── Onboarding gate ───────────────────────────────────────────────────────
   // New users (Google or email) have business_id = null until setup completes.
-  // next-url header is set by Next.js App Router for the current request path.
-  const headersList  = await headers()
-  const nextUrl      = headersList.get('next-url') ?? ''
-  const isSetupPage  = nextUrl.includes('/setup') || nextUrl === ''
+  const headersList = await headers()
+  const nextUrl     = headersList.get('next-url') ?? ''
+  const isSetupPage = nextUrl.includes('/setup') || nextUrl === ''
 
   if (!dbUser?.business_id && !isSetupPage) {
     redirect('/dashboard/setup')
   }
 
+  // ── Build typed profiles for DashboardShell ───────────────────────────────
   const userProfile = dbUser ? {
     name:        dbUser.name,
     role:        dbUser.role,

@@ -1,62 +1,68 @@
 'use server'
 
+import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
+import * as usersRepo from '@/lib/repositories/users.repo'
+import * as businessesRepo from '@/lib/repositories/businesses.repo'
 
-export async function createBusiness(prevState: any, formData: FormData) {
+// ── Zod schema for business creation ──────────────────────────────────────
+const CreateBusinessSchema = z.object({
+  name:     z.string().min(1, 'El nombre es obligatorio').max(100).transform(s => s.trim()),
+  category: z.string().min(1, 'La categoría es requerida'),
+})
+
+// ── Action state type ─────────────────────────────────────────────────────
+interface CreateBusinessState {
+  error?: string
+}
+
+export async function createBusiness(
+  prevState: CreateBusinessState | null,
+  formData: FormData
+): Promise<CreateBusinessState> {
   const supabase = await createClient()
 
+  // 1. Auth guard
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) redirect('/login')
 
-  const name = formData.get('name') as string
-  const category = formData.get('category') as string
+  // 2. Validate input
+  const parsed = CreateBusinessSchema.safeParse({
+    name:     formData.get('name'),
+    category: formData.get('category'),
+  })
 
-  if (!name?.trim() || !category) {
-    return { error: 'Nombre y categoría son requeridos' }
+  if (!parsed.success) {
+    const firstError = parsed.error.errors[0]?.message ?? 'Datos inválidos'
+    return { error: firstError }
   }
 
-  // Verificar si ya tiene negocio
-  const { data: existingUser } = await supabase
-    .from('users').select('business_id').eq('id', user.id).single()
+  const { name, category } = parsed.data
 
-  if (existingUser?.business_id) {
+  // 3. Check if user already has a business
+  const existingBizId = await usersRepo.getUserBusinessId(supabase, user.id)
+  if (existingBizId) {
     redirect('/dashboard')
   }
 
-  // 1. Crear el negocio
-  const { data: business, error: bizError } = await supabase
-    .from('businesses')
-    .insert({
-      name: name.trim(),
-      category,
-      owner_id: user.id,
-      plan: 'pro',
-    })
-    .select()
-    .single()
+  // 4. Create business via repo
+  const business = await businessesRepo.createBusiness(supabase, {
+    name,
+    category,
+    owner_id: user.id,
+    plan: 'pro',
+  })
 
-  if (bizError) {
-    console.error('Error creating business:', bizError)
-    return { error: 'No se pudo crear el negocio. Error: ' + bizError.message }
-  }
-
-  // 2. Asegurar que existe el perfil y vincularlo al negocio
-  const { error: upsertError } = await supabase
-    .from('users')
-    .upsert({
-      id: user.id,
-      name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Usuario',
-      email: user.email ?? '',
-      business_id: business.id,
-      role: 'owner',
-    }, { onConflict: 'id' })
-
-  if (upsertError) {
-    console.error('Error upserting user:', upsertError)
-    return { error: 'Error vinculando el perfil al negocio: ' + upsertError.message }
-  }
+  // 5. Link user to business via repo
+  await usersRepo.upsertUser(supabase, {
+    id: user.id,
+    name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Usuario',
+    email: user.email ?? '',
+    business_id: business.id,
+    role: 'owner',
+  })
 
   revalidatePath('/dashboard')
   redirect('/dashboard')

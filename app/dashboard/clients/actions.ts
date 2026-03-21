@@ -1,18 +1,21 @@
 'use server'
 
+import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import * as financesRepo from '@/lib/repositories/finances.repo'
 
-// ── Types ──────────────────────────────────────────────────────────────────
-interface RegisterPaymentInput {
-  business_id:      string
-  client_id:        string
-  amount:           number
-  method:           'other' | 'cash' | 'card' | 'transfer' | 'qr'
-  notes?:           string
-  appointment_id?:  string
-}
+// ── Zod schema for payment registration ───────────────────────────────────
+const RegisterPaymentSchema = z.object({
+  business_id:     z.string().uuid('ID de negocio inválido'),
+  client_id:       z.string().uuid('ID de cliente inválido'),
+  amount:          z.number().positive('El monto debe ser mayor a cero.'),
+  method:          z.enum(['cash', 'card', 'transfer', 'qr', 'other']),
+  notes:           z.string().max(200).optional(),
+  appointment_id:  z.string().uuid().optional(),
+})
 
+type RegisterPaymentInput = z.infer<typeof RegisterPaymentSchema>
 
 // ── Actions ────────────────────────────────────────────────────────────────
 
@@ -23,31 +26,31 @@ interface RegisterPaymentInput {
 export async function registerClientPayment(
   formData: RegisterPaymentInput
 ): Promise<{ success: true }> {
-  // Validate amount is positive
-  if (!formData.amount || formData.amount <= 0) {
-    throw new Error('El monto debe ser mayor a cero.')
+  // 1. Validate with Zod
+  const parsed = RegisterPaymentSchema.safeParse(formData)
+  if (!parsed.success) {
+    const firstError = parsed.error.errors[0]?.message ?? 'Datos inválidos'
+    throw new Error(firstError)
   }
 
+  const validData = parsed.data
   const supabase = await createClient()
 
-  // Verify the requesting user owns this business (RLS will also enforce this)
+  // 2. Auth guard
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('No autorizado.')
 
-  const { error } = await supabase.from('transactions').insert({
-    business_id:     formData.business_id,
-    client_id:       formData.client_id,
-    amount:          formData.amount,
-    net_amount:      formData.amount,
-    method:          formData.method,
-    notes:           formData.notes ?? null,
-    appointment_id:  formData.appointment_id ?? null,
-    paid_at:         new Date().toISOString(),
+  // 3. Create transaction via repo
+  await financesRepo.createTransaction(supabase, {
+    business_id:     validData.business_id,
+    amount:          validData.amount,
+    net_amount:      validData.amount,
+    method:          validData.method,
+    notes:           validData.notes ?? null,
+    appointment_id:  validData.appointment_id ?? null,
   })
 
-  if (error) throw new Error(error.message)
-
-  revalidatePath(`/dashboard/clients/${formData.client_id}`)
+  revalidatePath(`/dashboard/clients/${validData.client_id}`)
   revalidatePath('/dashboard/finances')
 
   return { success: true }

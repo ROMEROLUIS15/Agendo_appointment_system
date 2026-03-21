@@ -68,7 +68,7 @@ export default function ExpensesPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-foreground">
-                    {(expenseCategoryLabels as any)[exp.category] ?? exp.category ?? 'Gasto General'}
+                    {expenseCategoryLabels[exp.category as keyof typeof expenseCategoryLabels] ?? exp.category ?? 'Gasto General'}
                   </p>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {formatDate(exp.expense_date, 'd MMM yyyy')} · {exp.description || 'Sin descripción'}

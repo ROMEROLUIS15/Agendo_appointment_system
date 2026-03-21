@@ -16,7 +16,8 @@ import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
 import { getSession } from "@/lib/auth/get-session";
 import { formatCurrency, formatDate, formatRelative } from "@/lib/utils";
-import type { AppointmentStatus } from "@/types";
+import * as clientsRepo from "@/lib/repositories/clients.repo";
+import type { AppointmentStatus, ClientAppointmentWithDetails } from "@/types";
 import { isPast } from "date-fns";
 import { DebtActionDialog } from "./DebtActionDialog";
 
@@ -30,25 +31,11 @@ export default async function ClientDetailPage({ params }: Props) {
 
   const supabase = await createClient();
 
-  const { data: client } = await supabase
-    .from("clients")
-    .select("*")
-    .eq("id", params.id)
-    .eq("business_id", session.business_id)
-    .single();
-
+  const client = await clientsRepo.getClientById(supabase, params.id, session.business_id);
   if (!client) return notFound();
 
-  const { data: aptsData } = await supabase
-    .from("appointments")
-    .select(
-      "*, service:services(id, name, color, price, duration_min), transactions(net_amount, amount)",
-    )
-    .eq("client_id", client.id)
-    .eq("business_id", session.business_id)
-    .order("start_at", { ascending: false });
-
-  const clientAppointments = aptsData ?? [];
+  const clientAppointments: ClientAppointmentWithDetails[] =
+    await clientsRepo.getClientAppointments(supabase, client.id, session.business_id);
 
   // Calcular deudas (SÓLO CITAS PASADAS Y NO PAGADAS)
   let totalDebt = 0;
@@ -56,12 +43,11 @@ export default async function ClientDetailPage({ params }: Props) {
     if (apt.status !== "cancelled" && apt.status !== "no_show") {
       const isAptPast = isPast(new Date(apt.start_at));
       if (isAptPast) {
-        const price = (apt.service as any)?.price ?? 0;
-        const paid =
-          (apt.transactions as any[])?.reduce(
-            (sum, t) => sum + (t.net_amount ?? 0),
-            0,
-          ) ?? 0;
+        const price = apt.service?.price ?? 0;
+        const paid = apt.transactions?.reduce(
+          (sum, t) => sum + (t.net_amount ?? 0),
+          0,
+        ) ?? 0;
         const owes = price - paid;
         if (owes > 0) totalDebt += owes;
       }
@@ -190,12 +176,11 @@ export default async function ClientDetailPage({ params }: Props) {
         ) : (
           <div className="space-y-3">
             {displayAppointments.map((apt) => {
-              const price = (apt.service as any)?.price ?? 0;
-              const paid =
-                (apt.transactions as any[])?.reduce(
-                  (sum, t) => sum + (t.net_amount ?? 0),
-                  0,
-                ) ?? 0;
+              const price = apt.service?.price ?? 0;
+              const paid = apt.transactions?.reduce(
+                (sum, t) => sum + (t.net_amount ?? 0),
+                0,
+              ) ?? 0;
               const isAptPast = isPast(new Date(apt.start_at));
               const owes =
                 apt.status !== "cancelled" && apt.status !== "no_show" && isAptPast
@@ -210,12 +195,12 @@ export default async function ClientDetailPage({ params }: Props) {
                   <div
                     className="w-1 h-10 rounded-full flex-shrink-0"
                     style={{
-                      backgroundColor: (apt.service as any)?.color ?? "#ccc",
+                      backgroundColor: apt.service?.color ?? "#ccc",
                     }}
                   />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-foreground">
-                      {(apt.service as any)?.name ?? "—"}
+                      {apt.service?.name ?? "—"}
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {formatDate(apt.start_at, "d MMM yyyy, HH:mm")}

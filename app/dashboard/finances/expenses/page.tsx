@@ -6,44 +6,37 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { formatCurrency, formatDate, expenseCategoryLabels } from '@/lib/utils'
-import { createClient } from '@/lib/supabase/client'
+import { useBusinessContext } from '@/lib/hooks/use-business-context'
+import * as financesRepo from '@/lib/repositories/finances.repo'
+import type { ExpenseRow } from '@/types'
 
 export default function ExpensesPage() {
-  const supabase = createClient()
+  const { supabase, businessId, loading: contextLoading } = useBusinessContext()
   const [query, setQuery] = useState('')
-  const [expenses, setExpenses] = useState<any[]>([])
+  const [expenses, setExpenses] = useState<ExpenseRow[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    async function loadExpenses() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      
-      const { data: dbUser } = await supabase
-        .from('users')
-        .select('business_id')
-        .eq('id', user.id)
-        .single()
-        
-      if (!dbUser?.business_id) {
-        setLoading(false)
-        return
-      }
-      
-      const { data } = await supabase
-        .from('expenses')
-        .select('*')
-        .eq('business_id', dbUser.business_id)
-        .order('expense_date', { ascending: false })
-        
-      setExpenses(data || [])
-      setLoading(false)
+    if (!businessId) {
+      if (!contextLoading) setLoading(false)
+      return
     }
-    
-    loadExpenses()
-  }, [])
 
-  // REESCRITURA TOTAL DEL FILTRO: Blindaje de nivel industrial para Vercel
+    async function loadExpenses() {
+      try {
+        const data = await financesRepo.getExpenses(supabase, businessId!)
+        setExpenses(data)
+      } catch (err) {
+        console.error('Error loading expenses:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadExpenses()
+  }, [supabase, businessId, contextLoading])
+
+  // Filtro con blindaje defensivo
   const filtered = expenses.filter((e) => {
     const searchTerm = (query || '').toLowerCase()
     const description = String(e?.description || '').toLowerCase()
@@ -105,7 +98,7 @@ export default function ExpensesPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-foreground">
-                    {(expenseCategoryLabels as any)[exp.category] ?? exp.category ?? 'Gasto General'}
+                    {expenseCategoryLabels[exp.category] ?? 'Gasto General'}
                   </p>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {formatDate(exp.expense_date, 'd MMM yyyy')} · {exp.description || 'Sin descripción'}

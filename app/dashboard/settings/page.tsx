@@ -13,7 +13,7 @@ import {
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
-import type { Business, BusinessSettings } from "@/types";
+import type { Business, BusinessSettings, BusinessSettingsJson } from "@/types";
 import { PhoneInputFlags, parsePhone, COUNTRIES, Country } from "@/components/ui/phone-input-flags";
 
 const CATEGORIES = [
@@ -112,7 +112,7 @@ export default function SettingsPage() {
           phoneLocal: local,
           address: business.address ?? "",
         });
-        const wh = (business.settings as any)?.workingHours ?? {};
+        const wh = (business.settings as unknown as BusinessSettingsJson)?.workingHours ?? {};
         const loaded = buildDefaultHours();
         for (const { key } of DAYS) {
           const val = wh[key];
@@ -169,7 +169,7 @@ export default function SettingsPage() {
       const h = getHour(hours, key);
       workingHours[key] = h.active ? [h.open, h.close] : null;
     }
-    const currentSettings = (biz.settings as any) ?? {};
+    const currentSettings = (biz.settings as unknown as BusinessSettingsJson) ?? {};
     const { error } = await supabase
       .from("businesses")
       .update({ settings: { ...currentSettings, workingHours } })

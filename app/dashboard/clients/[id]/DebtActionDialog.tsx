@@ -7,6 +7,7 @@ import { Modal } from '@/components/ui/modal'
 import { Button } from '@/components/ui/button'
 import { formatCurrency } from '@/lib/utils'
 import { registerClientPayment } from '../actions'
+import type { PaymentMethod } from '@/types'
 
 interface Props {
   businessId: string
@@ -45,8 +46,8 @@ export function DebtActionDialog({ businessId, clientId, totalDebt }: Props) {
         notes: form.reference ? `Ref: ${form.reference}` : undefined
       })
       reset()
-    } catch (error: any) {
-      alert('Error: ' + error.message)
+    } catch (err) {
+      alert('Error: ' + (err instanceof Error ? err.message : 'Error desconocido'))
     } finally {
       setLoading(false)
     }
@@ -157,7 +158,7 @@ export function DebtActionDialog({ businessId, clientId, totalDebt }: Props) {
                 <label className="block text-sm font-bold text-foreground mb-2">Método</label>
                 <select
                   value={form.method}
-                  onChange={(e) => setForm({ ...form, method: e.target.value as any })}
+                  onChange={(e) => setForm({ ...form, method: e.target.value as PaymentMethod })}
                   className="input-base bg-card py-4"
                 >
                   <option value="cash">Efectivo</option>

@@ -6,38 +6,35 @@ import { Button } from '@/components/ui/button'
 import { Avatar } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { createClient } from '@/lib/supabase/client'
+import { useBusinessContext } from '@/lib/hooks/use-business-context'
+import * as clientsRepo from '@/lib/repositories/clients.repo'
 import { formatCurrency, formatRelative } from '@/lib/utils'
 import Link from 'next/link'
 import type { Client } from '@/types'
 
 export default function ClientsPage() {
-  const supabase = createClient()
+  const { supabase, businessId, loading: contextLoading } = useBusinessContext()
   const [clients, setClients] = useState<Client[]>([])
   const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState('')
 
   useEffect(() => {
+    if (!businessId) {
+      if (!contextLoading) setLoading(false)
+      return
+    }
     async function loadClients() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-
-      const { data: dbUser } = await supabase
-        .from('users').select('business_id').eq('id', user.id).single()
-      if (!dbUser?.business_id) { setLoading(false); return }
-
-      const { data } = await supabase
-        .from('clients')
-        .select('*')
-        .eq('business_id', dbUser.business_id)
-        .is('deleted_at', null)
-        .order('name')
-
-      setClients(data ?? [])
-      setLoading(false)
+      try {
+        const data = await clientsRepo.getClients(supabase, businessId!)
+        setClients(data)
+      } catch (err) {
+        console.error('Error loading clients:', err)
+      } finally {
+        setLoading(false)
+      }
     }
     loadClients()
-  }, [])
+  }, [supabase, businessId, contextLoading])
 
   const filtered = useMemo(() => {
     const q = query.toLowerCase()

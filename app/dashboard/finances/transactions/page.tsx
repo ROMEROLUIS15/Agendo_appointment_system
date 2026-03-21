@@ -6,42 +6,33 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { formatCurrency, formatDate, paymentMethodLabels } from '@/lib/utils'
-import { createClient } from '@/lib/supabase/client'
+import { useBusinessContext } from '@/lib/hooks/use-business-context'
+import * as financesRepo from '@/lib/repositories/finances.repo'
+import type { TransactionRow } from '@/types'
 
 export default function TransactionsPage() {
-  const supabase = createClient()
+  const { supabase, businessId, loading: contextLoading } = useBusinessContext()
   const [query, setQuery] = useState('')
-  const [transactions, setTransactions] = useState<any[]>([])
+  const [transactions, setTransactions] = useState<TransactionRow[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    async function loadTransactions() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      
-      const { data: dbUser } = await supabase
-        .from('users')
-        .select('business_id')
-        .eq('id', user.id)
-        .single()
-        
-      if (!dbUser?.business_id) {
-        setLoading(false)
-        return
-      }
-      
-      const { data } = await supabase
-        .from('transactions')
-        .select('*')
-        .eq('business_id', dbUser.business_id)
-        .order('paid_at', { ascending: false })
-        
-      setTransactions(data || [])
-      setLoading(false)
+    if (!businessId) {
+      if (!contextLoading) setLoading(false)
+      return
     }
-    
+    async function loadTransactions() {
+      try {
+        const data = await financesRepo.getTransactions(supabase, businessId!)
+        setTransactions(data)
+      } catch (err) {
+        console.error('Error loading transactions:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
     loadTransactions()
-  }, [])
+  }, [supabase, businessId, contextLoading])
 
   const filtered = transactions.filter((t) =>
     (t.notes ?? '').toLowerCase().includes(query.toLowerCase()) ||
