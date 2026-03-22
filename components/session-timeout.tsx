@@ -3,25 +3,29 @@
 import { useEffect, useCallback, useRef, useState } from 'react'
 import { signout } from '@/app/login/actions'
 
-// ── Constants ──────────────────────────────────────────────────────────────
+// ── Constants ───────────────────────────────────────────────────────────────
 /** Sign out after 30 min of inactivity */
-const INACTIVITY_TIMEOUT_MS  = 30 * 60 * 1000          // 30 min
+const INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000         // 30 min
 /** Show warning this many ms before inactivity timeout fires */
-const INACTIVITY_WARNING_MS  = 2  * 60 * 1000          // 2 min before → at 28 min
+const INACTIVITY_WARNING_MS = 2  * 60 * 1000          // 2 min before → at 28 min
 
 /** Absolute session limit: 12 hours */
-const ABSOLUTE_TIMEOUT_MS    = 12 * 60 * 60 * 1000     // 12 h
+const ABSOLUTE_TIMEOUT_MS   = 12 * 60 * 60 * 1000    // 12 h
 /** Show warning this many ms before the absolute limit */
-const ABSOLUTE_WARNING_MS    = 10 * 60 * 1000          // 10 min before → at 11h50m
+const ABSOLUTE_WARNING_MS   = 10 * 60 * 1000          // 10 min before → at 11h50m
 
 /** sessionStorage key that persists the login timestamp across page reloads */
 const SESSION_START_KEY = 'cronix_session_start'
 
 /** How often to re-check the absolute limit (ms) */
-const ABSOLUTE_POLL_MS = 30_000 // every 30 s
+const ABSOLUTE_POLL_MS = 30_000
+
+/** Server ping throttle — max one ping per minute */
+const PING_THROTTLE_MS = 60_000
 
 const ACTIVITY_EVENTS = [
   'mousemove',
+  'mousedown',
   'keydown',
   'scroll',
   'click',
@@ -47,14 +51,13 @@ function formatCountdown(ms: number): string {
   return m > 0 ? `${m}:${String(s).padStart(2, '0')} min` : `${s} seg`
 }
 
-// ── Warning Dialog ─────────────────────────────────────────────────────────
+// ── Warning Dialog ──────────────────────────────────────────────────────────
 interface WarningDialogProps {
-  title:       string
+  title:     string
   description: string
-  /** ms remaining until forced signout */
-  msLeft:      number
-  onKeep?:     () => void
-  onSignout:   () => void
+  msLeft:    number
+  onKeep?:   () => void
+  onSignout: () => void
 }
 
 function WarningDialog({ title, description, msLeft, onKeep, onSignout }: WarningDialogProps) {
@@ -81,11 +84,10 @@ function WarningDialog({ title, description, msLeft, onKeep, onSignout }: Warnin
         className="w-full max-w-sm rounded-2xl p-6 space-y-4 animate-slide-up"
         style={{
           backgroundColor: '#1A1A1F',
-          border: '1px solid #272729',
-          boxShadow: '0 20px 60px rgba(0,0,0,0.6)',
+          border:          '1px solid #272729',
+          boxShadow:       '0 20px 60px rgba(0,0,0,0.6)',
         }}
       >
-        {/* Icon */}
         <div
           className="h-12 w-12 rounded-2xl flex items-center justify-center mx-auto text-2xl"
           style={{ backgroundColor: 'rgba(255,214,10,0.1)', border: '1px solid rgba(255,214,10,0.25)' }}
@@ -93,7 +95,6 @@ function WarningDialog({ title, description, msLeft, onKeep, onSignout }: Warnin
           ⏱️
         </div>
 
-        {/* Text */}
         <div className="text-center space-y-1.5">
           <h2 className="text-base font-black" style={{ color: '#F2F2F2', letterSpacing: '-0.02em' }}>
             {title}
@@ -101,7 +102,6 @@ function WarningDialog({ title, description, msLeft, onKeep, onSignout }: Warnin
           <p className="text-sm" style={{ color: '#909098' }}>{description}</p>
         </div>
 
-        {/* Countdown */}
         <div
           className="text-center py-3 rounded-xl"
           style={{ backgroundColor: 'rgba(255,214,10,0.08)', border: '1px solid rgba(255,214,10,0.2)' }}
@@ -111,7 +111,6 @@ function WarningDialog({ title, description, msLeft, onKeep, onSignout }: Warnin
           </span>
         </div>
 
-        {/* Actions */}
         <div className={`grid gap-2 ${onKeep ? 'grid-cols-2' : 'grid-cols-1'}`}>
           {onKeep && (
             <button
@@ -127,8 +126,8 @@ function WarningDialog({ title, description, msLeft, onKeep, onSignout }: Warnin
             className="py-2.5 rounded-xl text-sm font-bold transition-all duration-200"
             style={{
               backgroundColor: 'rgba(255,59,48,0.1)',
-              color: '#FF3B30',
-              border: '1px solid rgba(255,59,48,0.2)',
+              color:           '#FF3B30',
+              border:          '1px solid rgba(255,59,48,0.2)',
             }}
           >
             Cerrar sesión
@@ -139,35 +138,65 @@ function WarningDialog({ title, description, msLeft, onKeep, onSignout }: Warnin
   )
 }
 
-// ── Component ──────────────────────────────────────────────────────────────
+// ── Component ───────────────────────────────────────────────────────────────
 /**
  * Invisible component mounted once in DashboardLayout.
  * Enforces two independent session limits:
- *   1. Inactivity timeout  — signs out after 15min with no user activity,
- *                            with a 2-min warning dialog.
- *   2. Absolute timeout    — signs out after 12h regardless of activity,
+ *
+ *   1. Inactivity timeout  — signs out after 30 min with no user activity
+ *                            (mousemove, keydown, scroll, click, touchstart).
+ *                            Shows a 2-min warning at 28 min.
+ *
+ *   2. Absolute timeout    — signs out after 12 h regardless of activity,
  *                            stored in sessionStorage so page reloads don't
- *                            reset the clock; shows a 10-min warning dialog.
+ *                            reset the clock. Shows a 10-min warning at 11h50m.
+ *
+ * Additionally, user activity is synced to the server via POST /api/activity/ping
+ * (throttled to once per minute) so the server-side middleware cookie stays fresh
+ * even when the user stays on a single page without navigating.
  */
 export function SessionTimeout() {
-  // ── Warning state ─────────────────────────────────────────────────────────
   type WarningType = 'inactivity' | 'absolute' | null
-  const [warning, setWarning] = useState<WarningType>(null)
-  const [warningMsLeft, setWarningMsLeft] = useState(0)
+
+  // ── Use a ref to expose current warning state to stable event handlers ─────
+  // This fixes the stale closure problem: event listeners registered once at
+  // mount always see the latest warning value via warningRef.current.
+  const warningRef              = useRef<WarningType>(null)
+  const [warning, _setWarning]  = useState<WarningType>(null)
+  const setWarning              = useCallback((w: WarningType) => {
+    warningRef.current = w
+    _setWarning(w)
+  }, [])
 
   // ── Refs ──────────────────────────────────────────────────────────────────
   const inactivityRef        = useRef<ReturnType<typeof setTimeout> | null>(null)
   const inactivityWarningRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const absolutePollRef      = useRef<ReturnType<typeof setInterval> | null>(null)
-  const warningShownRef      = useRef<WarningType>(null) // debounce duplicate shows
+  const warningShownRef      = useRef<WarningType>(null)
+  const lastPingRef          = useRef<number>(0)
+  const [warningMsLeft, setWarningMsLeft] = useState(0)
 
-  // ── Sign out helpers ───────────────────────────────────────────────────────
+  // ── Sign out ──────────────────────────────────────────────────────────────
   const doSignout = useCallback(async () => {
     sessionStorage.removeItem(SESSION_START_KEY)
     await signout()
   }, [])
 
-  // ── INACTIVITY TIMER ──────────────────────────────────────────────────────
+  // ── Server ping (throttled) ───────────────────────────────────────────────
+  // Keeps the middleware's cronix_last_activity cookie fresh while the user
+  // stays on the same page without triggering a navigation.
+  const pingServer = useCallback(async () => {
+    const now = Date.now()
+    if (now - lastPingRef.current < PING_THROTTLE_MS) return
+    lastPingRef.current = now
+    try {
+      await fetch('/api/activity/ping', { method: 'POST' })
+    } catch {
+      // silently ignore — the middleware will catch it on the next navigation
+    }
+  }, [])
+
+  // ── Inactivity timer ─────────────────────────────────────────────────────
   const clearInactivityTimers = useCallback(() => {
     if (inactivityRef.current)        clearTimeout(inactivityRef.current)
     if (inactivityWarningRef.current) clearTimeout(inactivityWarningRef.current)
@@ -175,13 +204,17 @@ export function SessionTimeout() {
 
   const resetInactivity = useCallback(() => {
     clearInactivityTimers()
-    // Dismiss inactivity warning if user acted
-    if (warning === 'inactivity') {
+
+    // Ping the server so the middleware cookie stays in sync
+    pingServer()
+
+    // Dismiss inactivity warning if user acted — use ref to avoid stale closure
+    if (warningRef.current === 'inactivity') {
       setWarning(null)
       warningShownRef.current = null
     }
 
-    // Warning fires at 13 min (2 min before the 15 min limit)
+    // Warning at 28 min
     inactivityWarningRef.current = setTimeout(() => {
       if (warningShownRef.current !== 'inactivity') {
         warningShownRef.current = 'inactivity'
@@ -190,20 +223,19 @@ export function SessionTimeout() {
       }
     }, INACTIVITY_TIMEOUT_MS - INACTIVITY_WARNING_MS)
 
-    // Hard signout at 15 min
+    // Hard signout at 30 min
     inactivityRef.current = setTimeout(() => {
       doSignout()
     }, INACTIVITY_TIMEOUT_MS)
-  }, [clearInactivityTimers, doSignout, warning])
+  }, [clearInactivityTimers, doSignout, pingServer, setWarning])
 
-  // ── ABSOLUTE TIMER (sessionStorage-backed) ────────────────────────────────
+  // ── Absolute timer (sessionStorage-backed) ────────────────────────────────
   const checkAbsoluteLimit = useCallback(() => {
     const sessionStart = getOrCreateSessionStart()
-    const elapsed  = Date.now() - sessionStart
-    const remaining = ABSOLUTE_TIMEOUT_MS - elapsed
+    const elapsed      = Date.now() - sessionStart
+    const remaining    = ABSOLUTE_TIMEOUT_MS - elapsed
 
     if (remaining <= 0) {
-      // 12 hours exceeded — sign out immediately
       doSignout()
       return
     }
@@ -213,21 +245,16 @@ export function SessionTimeout() {
       setWarningMsLeft(remaining)
       setWarning('absolute')
     }
-  }, [doSignout])
+  }, [doSignout, setWarning])
 
-  // ── Setup ──────────────────────────────────────────────────────────────────
+  // ── Setup ─────────────────────────────────────────────────────────────────
   useEffect(() => {
-    // Kick off the inactivity timer
     resetInactivity()
-
-    // Ensure the session start timestamp exists in sessionStorage
     getOrCreateSessionStart()
 
-    // Poll for absolute limit every 30s (survives page reloads via sessionStorage)
-    checkAbsoluteLimit() // check immediately on mount
+    checkAbsoluteLimit()
     absolutePollRef.current = setInterval(checkAbsoluteLimit, ABSOLUTE_POLL_MS)
 
-    // Register user activity listeners
     ACTIVITY_EVENTS.forEach(event =>
       window.addEventListener(event, resetInactivity, { passive: true })
     )
@@ -242,7 +269,7 @@ export function SessionTimeout() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // ── Render ─────────────────────────────────────────────────────────────────
+  // ── Render ────────────────────────────────────────────────────────────────
   if (!warning) return null
 
   if (warning === 'inactivity') {
@@ -261,7 +288,6 @@ export function SessionTimeout() {
     )
   }
 
-  // absolute warning — no "keep" button since it's a hard limit
   return (
     <WarningDialog
       title="Sesión por expirar"

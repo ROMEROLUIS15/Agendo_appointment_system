@@ -45,6 +45,7 @@ function NewAppointmentForm() {
   const [doubleBookingMsg,   setDoubleBookingMsg]   = useState('')
   const [slotError,          setSlotError]          = useState<string | null>(null)
   const [confirmed,          setConfirmed]          = useState(false)
+  const [validating,         setValidating]         = useState(false)
   const [reminderMinutes,    setReminderMinutes]    = useState<ReminderMinutes>(0)
   const [saving,             setSaving]             = useState(false)
   const [msg,                setMsg]                = useState<{ type: 'success' | 'error'; text: string } | null>(null)
@@ -71,68 +72,80 @@ function NewAppointmentForm() {
 
   const selectedService = services.find(s => s.id === form.service_id)
 
-  // ── Validation: slot overlap + double booking ──────────────────────────
-  useEffect(() => {
-    async function validate() {
-      setSlotError(null)
-      if (!form.client_id || !form.start_at || !form.service_id || !businessId) {
-        setDoubleBookingLevel('allowed')
-        setDoubleBookingMsg('')
-        return
-      }
-
-      const svc      = services.find(s => s.id === form.service_id)
-      const duration = svc?.duration_min ?? 30
-      const startObj = new Date(form.start_at)
-      const endObj   = new Date(startObj.getTime() + duration * 60_000)
-
-      const { start, end } = getLocalDayBoundaries(form.start_at)
-
-      const { data: dayApts } = await supabase
-        .from('appointments')
-        .select('id, start_at, end_at, client_id')
-        .eq('business_id', businessId)
-        .gte('start_at', start)
-        .lte('start_at', end)
-        .not('status', 'in', '("cancelled","no_show")')
-
-      // 1. Slot overlap — blocks any client in the same time window
-      const overlap = checkSlotOverlap({
-        proposedStart: startObj,
-        proposedEnd:   endObj,
-        existing:      dayApts ?? [],
-      })
-
-      if (overlap.overlaps) {
-        setSlotError(
-          `El horario ${startObj.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}–${endObj.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })} ya está ocupado (conflicto a las ${overlap.conflictTime}). Selecciona otro horario.`
-        )
-        setDoubleBookingLevel('blocked')
-        setDoubleBookingMsg('')
-        return
-      }
-
-      // 2. Double booking — warns if same client already has a cita that day
-      const clientApts    = (dayApts ?? []).filter(a => a.client_id === form.client_id)
-      const existingSlots = clientApts.map(a => ({
-        time:    new Date(a.start_at).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }),
-        service: '',
-      }))
-
-      const result = evaluateDoubleBooking({
-        existingCount: clientApts.length,
-        existingSlots,
-      })
-      setDoubleBookingLevel(result.level)
-      setDoubleBookingMsg(result.message)
-      setConfirmed(false)
+  // ── Core validation logic (reused by effect debounce AND handleSubmit) ──
+  async function runValidation(opts?: { excludeId?: string }) {
+    if (!form.client_id || !form.start_at || !form.service_id || !businessId) {
+      return { slotBlocked: false, bookingLevel: 'allowed' as DoubleBookingLevel, bookingMsg: '' }
     }
 
-    const t = setTimeout(validate, 500)
-    return () => clearTimeout(t)
+    const svc      = services.find(s => s.id === form.service_id)
+    const duration = svc?.duration_min ?? 30
+    const startObj = new Date(form.start_at)
+    const endObj   = new Date(startObj.getTime() + duration * 60_000)
+    const { start, end } = getLocalDayBoundaries(form.start_at)
+
+    const { data: dayApts } = await supabase
+      .from('appointments')
+      .select('id, start_at, end_at, client_id')
+      .eq('business_id', businessId)
+      .gte('start_at', start)
+      .lte('start_at', end)
+      .not('status', 'in', '("cancelled","no_show")')
+
+    const overlap = checkSlotOverlap({
+      proposedStart: startObj,
+      proposedEnd:   endObj,
+      existing:      dayApts ?? [],
+      excludeId:     opts?.excludeId,
+    })
+
+    if (overlap.overlaps) {
+      return {
+        slotBlocked: true,
+        slotMsg: `El horario ${startObj.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}–${endObj.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })} ya está ocupado (conflicto a las ${overlap.conflictTime}). Selecciona otro horario.`,
+        bookingLevel: 'blocked' as DoubleBookingLevel,
+        bookingMsg: '',
+      }
+    }
+
+    const clientApts    = (dayApts ?? []).filter(a => a.client_id === form.client_id)
+    const existingSlots = clientApts.map(a => ({
+      time:    new Date(a.start_at).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }),
+      service: '',
+    }))
+    const result = evaluateDoubleBooking({ existingCount: clientApts.length, existingSlots })
+
+    return { slotBlocked: false, bookingLevel: result.level, bookingMsg: result.message }
+  }
+
+  // ── Validation: slot overlap + double booking ──────────────────────────
+  useEffect(() => {
+    // Mark as validating immediately — disables submit button until check completes
+    setValidating(true)
+    setSlotError(null)
+
+    if (!form.client_id || !form.start_at || !form.service_id || !businessId) {
+      setDoubleBookingLevel('allowed')
+      setDoubleBookingMsg('')
+      setValidating(false)
+      return
+    }
+
+    const t = setTimeout(async () => {
+      const result = await runValidation()
+      setSlotError(result.slotBlocked ? (result.slotMsg ?? null) : null)
+      setDoubleBookingLevel(result.bookingLevel)
+      setDoubleBookingMsg(result.bookingMsg)
+      if (!result.slotBlocked) setConfirmed(false)
+      setValidating(false)
+    }, 400)
+
+    return () => { clearTimeout(t); setValidating(false) }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.client_id, form.start_at, form.service_id, businessId, services])
 
   const canSubmit =
+    !validating &&
     !slotError &&
     doubleBookingLevel !== 'blocked' &&
     !(doubleBookingLevel === 'warn' && !confirmed)
@@ -140,8 +153,30 @@ function NewAppointmentForm() {
   // ── Submit ─────────────────────────────────────────────────────────────
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!businessId || !canSubmit) return
+    if (!businessId) return
     setSaving(true)
+
+    // Re-validate right before saving — guards against race conditions where
+    // another appointment was created after the debounced check ran.
+    const fresh = await runValidation()
+    if (fresh.slotBlocked) {
+      setSlotError(fresh.slotMsg ?? null)
+      setDoubleBookingLevel('blocked')
+      setSaving(false)
+      return
+    }
+    if (fresh.bookingLevel === 'blocked') {
+      setDoubleBookingLevel('blocked')
+      setDoubleBookingMsg(fresh.bookingMsg)
+      setSaving(false)
+      return
+    }
+    if (fresh.bookingLevel === 'warn' && !confirmed) {
+      setDoubleBookingLevel('warn')
+      setDoubleBookingMsg(fresh.bookingMsg)
+      setSaving(false)
+      return
+    }
 
     const startObj = new Date(form.start_at)
     const endObj   = new Date(startObj.getTime() + (selectedService?.duration_min ?? 30) * 60_000)

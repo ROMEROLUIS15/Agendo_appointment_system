@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { PwaInstallBanner } from "@/components/ui/pwa-install-banner";
+import { PwaInstallFloating } from "@/components/ui/pwa-install-floating";
 
 export default function RootPage() {
   return (
@@ -162,7 +163,7 @@ export default function RootPage() {
 
       {/* ── Hero ── */}
       <main
-        className="px-5 sm:px-8 py-16 sm:py-20" // FIXED: responsive padding
+        className="px-5 sm:px-8 py-6 sm:py-14 md:py-20"
         style={{
           position: "relative",
           zIndex: 10,
@@ -176,13 +177,13 @@ export default function RootPage() {
       >
         {/* Badge */}
         <div
+          className="mb-4 sm:mb-8"
           style={{
             display: "inline-flex",
             alignItems: "center",
             gap: "8px",
             padding: "6px 16px",
             borderRadius: "999px",
-            marginBottom: "32px",
             background: "rgba(0,98,255,0.08)",
             border: "1px solid rgba(0,98,255,0.2)",
           }}
@@ -212,12 +213,9 @@ export default function RootPage() {
 
         {/* Logo mark large */}
         <div
+          className="w-[72px] h-[72px] sm:w-[88px] sm:h-[88px] rounded-[20px] sm:rounded-[24px] mb-4 sm:mb-7"
           style={{
-            width: "88px",
-            height: "88px",
-            borderRadius: "24px",
             overflow: "hidden",
-            marginBottom: "28px",
             flexShrink: 0,
             boxShadow:
               "0 0 40px rgba(0,98,255,0.3), 0 0 80px rgba(0,98,255,0.1)",
@@ -236,11 +234,8 @@ export default function RootPage() {
 
         {/* Wordmark */}
         <div
-          className="w-[200px] h-[40px] sm:w-[260px] sm:h-[54px]" // FIXED: responsive size
-          style={{
-            position: "relative",
-            marginBottom: "24px",
-          }}
+          className="w-[180px] h-[36px] sm:w-[260px] sm:h-[54px] mb-3 sm:mb-6"
+          style={{ position: "relative" }}
         >
           <Image
             src="/cronix-letras.jpg"
@@ -253,13 +248,13 @@ export default function RootPage() {
 
         {/* Tagline */}
         <p
+          className="mb-6 sm:mb-10"
           style={{
-            fontSize: "18px",
+            fontSize: "clamp(14px, 4vw, 18px)",
             fontWeight: 400,
             lineHeight: 1.6,
             color: "#909098",
             maxWidth: "520px",
-            marginBottom: "48px",
           }}
         >
           Gestiona citas, clientes y finanzas de tu negocio en{" "}
@@ -271,12 +266,12 @@ export default function RootPage() {
 
         {/* CTAs */}
         <div
+          className="mb-6 sm:mb-14"
           style={{
             display: "flex",
             gap: "12px",
             flexWrap: "wrap",
             justifyContent: "center",
-            marginBottom: "64px",
           }}
         >
           <Link
@@ -327,17 +322,19 @@ export default function RootPage() {
           >
             Iniciar Sesión
           </Link>
-          <PwaInstallBanner />
+          {/* Desktop only — mobile uses PwaInstallFloating */}
+          <span className="hidden lg:contents">
+            <PwaInstallBanner />
+          </span>
         </div>
 
-        {/* Feature pills */}
+        {/* Feature pills — hidden on mobile to keep CTAs in viewport */}
         <div
+          className="hidden sm:flex mb-10 sm:mb-14"
           style={{
-            display: "flex",
             gap: "10px",
             flexWrap: "wrap",
             justifyContent: "center",
-            marginBottom: "64px",
           }}
         >
           {[
@@ -366,9 +363,9 @@ export default function RootPage() {
           ))}
         </div>
 
-        {/* Dashboard preview mockup */}
+        {/* Dashboard preview mockup — hidden on mobile */}
         <div
-          className="w-full max-w-[860px] rounded-[20px]" // FIXED: responsive max-width
+          className="hidden sm:block w-full max-w-[860px] rounded-[20px]"
           style={{
             overflow: "hidden", // this is fine since it's the mockup container
             border: "1px solid rgba(0,98,255,0.15)",
@@ -597,6 +594,7 @@ export default function RootPage() {
 
         {/* Bottom tagline */}
         <p
+          className="hidden sm:block"
           style={{
             marginTop: "40px",
             fontSize: "12px",
@@ -616,6 +614,9 @@ export default function RootPage() {
         }
         a:hover { opacity: 0.9; }
       `}</style>
+
+      {/* Floating install bar — mobile only, always visible without scroll */}
+      <PwaInstallFloating />
     </div>
   );
 }

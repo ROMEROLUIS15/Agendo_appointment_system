@@ -40,4 +40,5 @@ coverage/
 
 # Herramientas de IA y temporales
 .agent/
+.claude/
 .cache/

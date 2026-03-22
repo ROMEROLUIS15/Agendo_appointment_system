@@ -10,6 +10,8 @@ import {
   Shield,
 } from "lucide-react";
 import { PwaInstallBanner } from "@/components/ui/pwa-install-banner";
+import { PwaInstallFloating } from "@/components/ui/pwa-install-floating";
+import { PasskeyLoginButton } from "@/components/ui/passkey-login-button";
 import { useState, useTransition, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { loginSchema } from "@/lib/validations/auth";
@@ -42,11 +44,13 @@ const FEATURES = [
 
 /** Reads ?reason=inactivity from URL and calls back if present. Isolated in its
  *  own component so useSearchParams() has a Suspense boundary (Next.js 14 req). */
-function InactivityDetector({ onInactivity }: { onInactivity: () => void }) {
+function InactivityDetector({ onInactivity, onSessionExpired }: { onInactivity: () => void; onSessionExpired: () => void }) {
   const searchParams = useSearchParams();
   useEffect(() => {
-    if (searchParams.get('reason') === 'inactivity') onInactivity()
-  }, [searchParams, onInactivity])
+    const reason = searchParams.get('reason')
+    if (reason === 'inactivity')      onInactivity()
+    if (reason === 'session_expired') onSessionExpired()
+  }, [searchParams, onInactivity, onSessionExpired])
   return null
 }
 
@@ -85,9 +89,14 @@ export default function LoginPage() {
       style={{ backgroundColor: "#060608" }}
     >
       <Suspense fallback={null}>
-        <InactivityDetector onInactivity={() =>
-          setError('Tu sesión expiró por inactividad. Por favor inicia sesión de nuevo.')
-        } />
+        <InactivityDetector
+          onInactivity={() =>
+            setError('Tu sesión se cerró por 30 minutos de inactividad. Por favor inicia sesión de nuevo.')
+          }
+          onSessionExpired={() =>
+            setError('Tu sesión de 12 horas expiró. Por favor inicia sesión de nuevo.')
+          }
+        />
       </Suspense>
 
       {/* ── BRAND PANEL ── */}
@@ -770,6 +779,9 @@ export default function LoginPage() {
               </div>
             </div>
 
+            {/* Biometric / Passkey */}
+            <PasskeyLoginButton />
+
             {/* Google */}
             <button
               type="button"
@@ -823,12 +835,15 @@ export default function LoginPage() {
             </Link>
           </p>
 
-          {/* PWA install prompt */}
-          <div className="flex justify-center mt-5">
+          {/* PWA install prompt — desktop only; mobile uses PwaInstallFloating */}
+          <div className="hidden lg:flex justify-center mt-5">
             <PwaInstallBanner />
           </div>
         </div>
       </div>
+
+      {/* Floating install bar — mobile only, always visible without scroll */}
+      <PwaInstallFloating />
     </div>
   );
 }

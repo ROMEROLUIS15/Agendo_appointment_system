@@ -9,6 +9,7 @@ import { useBusinessContext } from '@/lib/hooks/use-business-context'
 import { updateProfile } from './actions'
 import { PasswordInput } from '@/components/ui/password-input'
 import { PhoneInputFlags, parsePhone, type Country, COUNTRIES } from '@/components/ui/phone-input-flags'
+import { PasskeyRegister } from '@/components/ui/passkey-register'
 
 interface ProfileUser {
   id: string
@@ -321,6 +322,11 @@ export default function ProfilePage() {
           </Button>
         </div>
       </form>
+
+      {/* ── Passkeys ── */}
+      <Card className="p-5 sm:p-6">
+        <PasskeyRegister />
+      </Card>
     </div>
   )
 }
