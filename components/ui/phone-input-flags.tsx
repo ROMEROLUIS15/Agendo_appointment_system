@@ -210,11 +210,12 @@ export function PhoneInputFlags({
             title="Importar desde agenda"
             className="flex items-center justify-center rounded-xl transition-all flex-shrink-0"
             style={{
-              background: 'rgba(0,98,255,0.1)',
-              border:     '1px solid rgba(0,98,255,0.25)',
-              color:      '#4D83FF',
+              background: '#0062FF',
+              border:     '1px solid rgba(0,98,255,0.6)',
+              color:      '#fff',
               width:      '42px',
               height:     '42px',
+              boxShadow:  '0 0 10px rgba(0,98,255,0.35)',
             }}
           >
             {pickContactLoading
