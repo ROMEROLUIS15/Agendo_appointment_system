@@ -10,7 +10,7 @@
 
 ---
 
-## Technical Highlights (Seniority Focus)
+## Technical Highlights
 - **Cutting-Edge Security:** Implementation of Passkeys (WebAuthn) eliminating password dependency.
 - **Robust Data Architecture:** Intensive use of **PostgreSQL RLS** (Row Level Security) with 26 automated tests in **pgTAP**, guaranteeing real multi-tenancy at the database level.
 - **Serverless Automation:** Scalable reminder system using **Supabase Edge Functions (Deno)** and **pg_cron**, integrated with Meta's WhatsApp Cloud API v19.0.
@@ -49,52 +49,52 @@
 ## Architecture
 
 cronix/
-├── app/ # Next.js App Router
-│ ├── api/ # API Routes (Node.js — only what requires native bindings)
-│ │ ├── passkey/ # WebAuthn register + authenticate (@simplewebauthn C++)
-│ │ └── activity/ping/ # Session heartbeat
-│ ├── auth/callback/ # OAuth callback (Google) + identity linking
-│ ├── dashboard/ # Protected pages (layout + subpages)
-│ │ ├── appointments/ # Appointments CRUD + resolution of expired ones
-│ │ ├── clients/ # Clients CRUD + history + debts
-│ │ ├── finances/ # Transactions and expenses
-│ │ ├── services/ # Business services
-│ │ ├── team/ # Employee management
-│ │ ├── reports/ # Reports and analytics
-│ │ ├── profile/ # Profile + passkeys
-│ │ ├── settings/ # Configuration
-│ │ └── setup/ # Onboarding wizard
-│ ├── login/ # Login with email, Google, Passkeys
-│ ├── register/ # Account registration
-│ ├── forgot-password/ # Password recovery
-│ └── reset-password/ # Password reset
+├── app/                    # Next.js App Router
+│   ├── api/                # API Routes (Node.js — only what requires native bindings)
+│   │   ├── passkey/        # WebAuthn register + authenticate (@simplewebauthn C++)
+│   │   └── activity/ping/  # Session heartbeat
+│   ├── auth/callback/      # OAuth callback (Google) + identity linking
+│   ├── dashboard/          # Protected pages (layout + subpages)
+│   │   ├── appointments/   # Appointments CRUD + resolution of expired ones
+│   │   ├── clients/        # Clients CRUD + history + debts
+│   │   ├── finances/       # Transactions and expenses
+│   │   ├── services/       # Business services
+│   │   ├── team/           # Employee management
+│   │   ├── reports/        # Reports and analytics
+│   │   ├── profile/        # Profile + passkeys
+│   │   ├── settings/       # Configuration
+│   │   └── setup/          # Onboarding wizard
+│   ├── login/              # Login with email, Google, Passkeys
+│   ├── register/           # Account registration
+│   ├── forgot-password/    # Password recovery
+│   └── reset-password/     # Password reset
 ├── components/
-│ ├── ui/ # Reusable primitives (Modal, Card, Avatar, etc.)
-│ ├── layout/ # Sidebar, Topbar, DashboardShell, BottomNav
-│ ├── dashboard/ # Dashboard-specific components
-│ └── providers.tsx # QueryClientProvider (React Query)
+│   ├── ui/                 # Reusable primitives (Modal, Card, Avatar, etc.)
+│   ├── layout/             # Sidebar, Topbar, DashboardShell, BottomNav
+│   ├── dashboard/          # Dashboard-specific components
+│   └── providers.tsx       # QueryClientProvider (React Query)
 ├── lib/
-│ ├── supabase/ # Clients (browser, server, admin, middleware)
-│ ├── repositories/ # Data access layer (by table)
-│ ├── use-cases/ # Business logic (validations, rules)
-│ ├── services/ # External services (WhatsApp)
-│ ├── validations/ # Zod schemas
-│ ├── hooks/ # React hooks (useBusinessContext, useFetch, usePwaInstall)
-│ └── utils.ts # General utilities
-├── types/ # Global TypeScript types + generated DB types
+│   ├── supabase/           # Clients (browser, server, admin, middleware)
+│   ├── repositories/       # Data access layer (by table)
+│   ├── use-cases/          # Business logic (validations, rules)
+│   ├── services/           # External services (WhatsApp)
+│   ├── validations/        # Zod schemas
+│   ├── hooks/              # React hooks (useBusinessContext, useFetch, usePwaInstall)
+│   └── utils.ts            # General utilities
+├── types/                  # Global TypeScript types + generated DB types
 ├── supabase/
-│ ├── functions/ # Edge Functions (Deno)
-│ │ ├── whatsapp-service/ # WhatsApp message sending
-│ │ ├── push-notify/ # Web Push RFC 8291 (VAPID + AES-128-GCM)
-│ │ └── cron-reminders/ # Reminder processing (called by pg_cron)
-│ ├── migrations/ # Versioned SQL migrations
-│ └── tests/ # pgTAP tests for RLS (26 tests)
-├── worker/ # Custom Service Worker (merged by next-pwa)
+│   ├── functions/          # Edge Functions (Deno)
+│   │   ├── whatsapp-service/ # WhatsApp message sending
+│   │   ├── push-notify/    # Web Push RFC 8291 (VAPID + AES-128-GCM)
+│   │   └── cron-reminders/ # Reminder processing (called by pg_cron)
+│   ├── migrations/         # Versioned SQL migrations
+│   └── tests/              # pgTAP tests for RLS (26 tests)
+├── worker/                 # Custom Service Worker (merged by next-pwa)
 └── public/
-├── manifest.json # PWA manifest with splash screens
-├── sw.js # Compiled Service Worker
-├── icon-192x192.png # PWA icon (generated with Sharp)
-└── icon-512x512.png # PWA icon (generated with Sharp)
+    ├── manifest.json       # PWA manifest with splash screens
+    ├── sw.js               # Compiled Service Worker
+    ├── icon-192x192.png    # PWA icon (generated with Sharp)
+    └── icon-512x512.png    # PWA icon (generated with Sharp)
 
 ---
 
