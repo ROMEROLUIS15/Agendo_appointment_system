@@ -105,6 +105,10 @@ Deno.serve(async (req: Request) => {
 
   const results = { sent: 0, failed: 0, skipped: 0 }
 
+  // Accumulate sent clients per business for the consolidated push at the end
+  // Map<business_id, { name, time }[]>
+  const sentByBusiness = new Map<string, { clientName: string; time: string }[]>()
+
   // ── Process each reminder ────────────────────────────────────────────────
   for (const raw of reminders) {
     const reminder = raw as unknown as ReminderRow
@@ -178,22 +182,10 @@ Deno.serve(async (req: Request) => {
           .eq('id', reminder.id)
         results.sent++
 
-        // ── Web Push al dueño del negocio (non-blocking, best-effort) ───
-        // El cliente ya recibió WhatsApp; el dueño recibe push en su dispositivo.
-        const pushUrl = `${supabaseUrl}/functions/v1/push-notify`
-        fetch(pushUrl, {
-          method:  'POST',
-          headers: {
-            'Content-Type':      'application/json',
-            'x-internal-secret': cronSecret,
-          },
-          body: JSON.stringify({
-            business_id: reminder.business_id,
-            title:       '⏰ Recordatorio enviado',
-            body:        `Cita con ${client.name} · ${time}`,
-            url:         '/dashboard',
-          }),
-        }).catch(err => console.warn('[cron-reminders] push-notify call failed:', err))
+        // Accumulate for consolidated push at end of run
+        const prev = sentByBusiness.get(reminder.business_id) ?? []
+        prev.push({ clientName: client.name, time })
+        sentByBusiness.set(reminder.business_id, prev)
 
       } else {
         const errMsg = data.error ?? `HTTP ${res.status}`
@@ -211,6 +203,35 @@ Deno.serve(async (req: Request) => {
         .eq('id', reminder.id)
       results.failed++
     }
+  }
+
+  // ── Send one consolidated push per business ─────────────────────────────
+  const pushUrl = `${supabaseUrl}/functions/v1/push-notify`
+  for (const [businessId, clients] of sentByBusiness) {
+    const count = clients.length
+    const title = `⏰ ${count} recordatorio${count > 1 ? 's' : ''} enviado${count > 1 ? 's' : ''}`
+
+    // List up to 4 clients with name · time, then "+N más" if overflow
+    const MAX_LISTED = 4
+    const listed = clients.slice(0, MAX_LISTED)
+      .map(c => `${c.clientName} · ${c.time}`)
+      .join('\n')
+    const overflow = count > MAX_LISTED ? `\n+${count - MAX_LISTED} más` : ''
+    const body = listed + overflow
+
+    fetch(pushUrl, {
+      method:  'POST',
+      headers: {
+        'Content-Type':      'application/json',
+        'x-internal-secret': cronSecret,
+      },
+      body: JSON.stringify({
+        business_id: businessId,
+        title,
+        body,
+        url: '/dashboard',
+      }),
+    }).catch(() => null)
   }
 
   return json({

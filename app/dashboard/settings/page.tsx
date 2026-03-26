@@ -12,10 +12,11 @@ import {
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { createClient } from "@/lib/supabase/client";
 import type { Business, BusinessSettings, BusinessSettingsJson } from "@/types";
 import { PhoneInputFlags, parsePhone, buildPhone, COUNTRIES, Country } from "@/components/ui/phone-input-flags";
 import { BUSINESS_CATEGORIES } from "@/lib/constants/business";
+import { useNotifications } from "@/lib/hooks/use-notifications";
+import { useBusinessContext } from "@/lib/hooks/use-business-context";
 
 const DAYS = [
   { key: "mon", label: "Lunes" },
@@ -45,9 +46,9 @@ function getHour(hours: Record<string, DayHours>, key: string): DayHours {
 }
 
 export default function SettingsPage() {
-  const supabase = createClient();
+  // useBusinessContext is cached in React Query — no extra auth queries on navigation
+  const { supabase, businessId: bizId, loading: contextLoading } = useBusinessContext();
   const [biz, setBiz] = useState<Business | null>(null);
-  const [bizId, setBizId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savingHours, setSavingHours] = useState(false);
@@ -69,27 +70,19 @@ export default function SettingsPage() {
     email:    boolean
   }>({ whatsapp: false, email: false });
   const [savingNotif, setSavingNotif] = useState(false);
+  const notif = useNotifications(bizId);
 
+  // Only one query needed — auth/business_id come from cached context
   useEffect(() => {
+    if (contextLoading || !bizId) {
+      if (!contextLoading) setLoading(false);
+      return;
+    }
     async function load() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
-      const { data: dbUser } = await supabase
-        .from("users")
-        .select("business_id")
-        .eq("id", user.id)
-        .single();
-      if (!dbUser?.business_id) {
-        setLoading(false);
-        return;
-      }
-      setBizId(dbUser.business_id);
       const { data: business } = await supabase
         .from("businesses")
         .select("id, name, category, phone, address, logo_url, slug, owner_id, settings, timezone, locale, plan, created_at, updated_at")
-        .eq("id", dbUser.business_id)
+        .eq("id", bizId!)
         .single();
       if (business) {
         setBiz(business);
@@ -114,11 +107,11 @@ export default function SettingsPage() {
           }
         }
         setHours(loaded);
-        const notif = (business.settings as unknown as BusinessSettingsJson)?.notifications
-        if (notif) {
+        const notifData = (business.settings as unknown as BusinessSettingsJson)?.notifications
+        if (notifData) {
           setNotifSettings({
-            whatsapp: notif.whatsapp ?? false,
-            email:    notif.email    ?? false,
+            whatsapp: notifData.whatsapp ?? false,
+            email:    notifData.email    ?? false,
           });
         }
       }
@@ -126,7 +119,7 @@ export default function SettingsPage() {
     }
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [contextLoading, bizId]);
 
   const showMsg = (type: "success" | "error", text: string) => {
     setMsg({ type, text });
@@ -551,6 +544,43 @@ export default function SettingsPage() {
               </label>
             </div>
           ))}
+          {/* PWA Push Notifications */}
+          {notif.state !== 'unsupported' && (
+            <div
+              className="flex items-center justify-between p-4 rounded-xl"
+              style={{ background: "#212125", border: "1px solid #2E2E33" }}
+            >
+              <div>
+                <p className="text-sm font-medium" style={{ color: "#F2F2F2" }}>
+                  Notificaciones Push
+                </p>
+                <p className="text-xs" style={{ color: "#909098" }}>
+                  {notif.state === 'denied'
+                    ? 'Bloqueadas — actívalas en la configuración de tu navegador'
+                    : notif.subscribed
+                    ? 'Activo en este dispositivo'
+                    : 'Recibe alertas de citas en este dispositivo'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => notif.subscribed ? notif.unsubscribe() : notif.subscribe()}
+                disabled={notif.loading || notif.state === 'denied'}
+                className="relative flex-shrink-0"
+                aria-label="Activar notificaciones push"
+              >
+                <div
+                  className="w-10 h-5 rounded-full transition-colors"
+                  style={{ background: notif.subscribed ? '#0062FF' : '#3A3A3F' }}
+                />
+                <div
+                  className="absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all duration-200"
+                  style={{ left: notif.subscribed ? '22px' : '2px' }}
+                />
+              </button>
+            </div>
+          )}
+
           <div className="flex justify-end pt-2">
             <Button
               onClick={handleSaveNotifications}

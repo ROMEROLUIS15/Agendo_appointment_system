@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Plus,
   ChevronLeft,
@@ -63,9 +63,7 @@ export default function DashboardPage() {
   const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [monthApts, setMonthApts] = useState<AppointmentWithRelations[]>([]);
-  const [dayApts, setDayApts] = useState<AppointmentWithRelations[]>([]);
   const [loading, setLoading] = useState(true);
-  const [dayLoading, setDayLoading] = useState(false);
   const [selectedApt, setSelectedApt] = useState<AppointmentWithRelations | null>(null);
   const [panelOpen, setPanelOpen] = useState(false);
   const [dayPanelOpen, setDayPanelOpen] = useState(false);
@@ -104,25 +102,6 @@ export default function DashboardPage() {
     }
   }, [supabase, businessId, currentMonth]);
 
-  // ── Fetch selected day appointments ──────────────────────────
-  const fetchDayApts = useCallback(async () => {
-    if (!businessId) return;
-    setDayLoading(true);
-    try {
-      const dateStr = format(selectedDate, "yyyy-MM-dd");
-      const data = await appointmentsRepo.getDayAppointments(
-        supabase,
-        businessId,
-        dateStr,
-      );
-      setDayApts(data);
-    } catch (err) {
-      setFetchError(err instanceof Error ? err.message : 'No se pudieron cargar las citas del día');
-    } finally {
-      setDayLoading(false);
-    }
-  }, [supabase, businessId, selectedDate]);
-
   // ── Fetch stats ───────────────────────────────────────────────
   const fetchStats = useCallback(async () => {
     if (!businessId) return;
@@ -151,9 +130,6 @@ export default function DashboardPage() {
       setLoading(false);
     }
   }, [fetchMonthApts, contextLoading, businessId]);
-  useEffect(() => {
-    if (dayPanelOpen) fetchDayApts();
-  }, [fetchDayApts, dayPanelOpen]);
   useEffect(() => {
     if (businessId) {
       fetchStats();
@@ -193,9 +169,7 @@ export default function DashboardPage() {
     try {
       await appointmentsRepo.updateAppointmentStatus(supabase, selectedApt.id, status);
       setSelectedApt((prev) => (prev ? { ...prev, status } : null));
-      fetchMonthApts();
-      fetchDayApts();
-      fetchStats();
+      Promise.all([fetchMonthApts(), fetchStats()]);
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'No se pudo actualizar el estado');
     } finally {
@@ -212,9 +186,7 @@ export default function DashboardPage() {
         setPanelOpen(false);
         setSelectedApt(null);
       }
-      fetchMonthApts();
-      fetchDayApts();
-      fetchStats();
+      Promise.all([fetchMonthApts(), fetchStats()]);
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'No se pudo cancelar la cita');
     } finally {
@@ -222,8 +194,14 @@ export default function DashboardPage() {
     }
   };
 
-  // ── Build calendar grid ───────────────────────────────────────
-  const calendarDays: Date[] = (() => {
+  // ── Derive day appointments from already-loaded month data ───
+  const dayApts = useMemo(
+    () => monthApts.filter(a => isSameDay(parseISO(a.start_at), selectedDate)),
+    [monthApts, selectedDate],
+  );
+
+  // ── Build calendar grid (memoized — only changes when month changes) ──
+  const calendarDays = useMemo(() => {
     const start = startOfWeek(startOfMonth(currentMonth), { weekStartsOn: 1 });
     const end = endOfWeek(endOfMonth(currentMonth), { weekStartsOn: 1 });
     const days: Date[] = [];
@@ -233,7 +211,7 @@ export default function DashboardPage() {
       cur = addDays(cur, 1);
     }
     return days;
-  })();
+  }, [currentMonth]);
 
   const today = new Date();
   const WEEK_HEADERS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
@@ -895,7 +873,7 @@ export default function DashboardPage() {
 
             {/* Day appointments list */}
             <div className="flex-1 overflow-y-auto">
-              {dayLoading ? (
+              {loading ? (
                 <div className="flex justify-center items-center h-40">
                   <Loader2
                     size={24}
@@ -1082,7 +1060,6 @@ export default function DashboardPage() {
                                       .eq("id", apt.id);
                                     setUpdatingStatus(false);
                                     fetchMonthApts();
-                                    fetchDayApts();
                                   }}
                                   className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-[11px] font-bold transition-colors"
                                   style={{

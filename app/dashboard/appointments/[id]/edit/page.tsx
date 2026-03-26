@@ -279,9 +279,12 @@ export default function EditAppointmentPage({ params }: Props) {
 
     if (!error) {
       await cancelRemindersByAppointment(supabase, params.id).catch(() => null)
-      if (bizNotif.whatsapp && !skipReminder && bizNotif.reminderMinutes > 0 && businessId) {
-        const remindAt = new Date(startObj.getTime() - bizNotif.reminderMinutes * 60_000).toISOString()
-        await upsertReminder(supabase, params.id, businessId, remindAt, bizNotif.reminderMinutes).catch(() => null)
+      if (bizNotif.whatsapp && !skipReminder && businessId) {
+        // remind_at = midnight UTC on appointment day = 8 PM Venezuela (UTC-4) the evening before
+        const remindAt = new Date(Date.UTC(
+          startObj.getUTCFullYear(), startObj.getUTCMonth(), startObj.getUTCDate()
+        )).toISOString()
+        await upsertReminder(supabase, params.id, businessId, remindAt, 0).catch(() => null)
       }
     }
 
@@ -472,7 +475,7 @@ export default function EditAppointmentPage({ params }: Props) {
                   <span className="text-sm" style={{ color: skipReminder ? '#606068' : '#F2F2F2' }}>
                     {skipReminder
                       ? 'Sin recordatorio para esta cita'
-                      : `WhatsApp ${fmtReminder(bizNotif.reminderMinutes)} antes`
+                      : 'WhatsApp · 8 PM día anterior'
                     }
                   </span>
                 </div>
