@@ -20,7 +20,7 @@ export default function NewExpensePage() {
     category: 'supplies' as ExpenseCategory,
     amount:   '',
     description: '',
-    date:     new Date().toISOString().split('T')[0],
+    date:     new Date().toISOString().split('T')[0] as string,
   })
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
